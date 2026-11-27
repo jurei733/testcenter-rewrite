@@ -33,7 +33,7 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
   await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({$schema:'https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json',id:'owned-command-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'en',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
   await upload('unit.xml',xml('Unit','<Metadata><Id>ORACLE.POW.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-command-player@1.2.3">Owned definition</Definition>'));
   await upload('booklet.xml',xml('Booklet','<Metadata><Id>ORACLE.POW.BOOK</Id><Label>  Current Booklet Ω\n  </Label></Metadata><Units><Unit id="ORACLE.POW.UNIT" label="Owned Unit"/></Units>'));
-  await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="ORACLE.COMMAND" label="Owned native commands">'+[one,two,'owned-command-canonical'].map(name=>`<Login name="${name}" pw="${password}" mode="${name==='owned-command-canonical'?'run-hot-return':'run-review'}"><Booklet codes="Shared">ORACLE.POW.BOOK</Booklet></Login>`).join('')+`<Login name="${monitorName}" pw="${password}" mode="monitor-group"/></Group><Group id="OTHER.COMMAND" label="Other group"><Login name="owned-other-command" pw="${password}" mode="run-review"><Booklet codes="Shared">ORACLE.POW.BOOK</Booklet></Login></Group>`)});
+  await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="ORACLE.COMMAND" label="Owned native commands">'+[[one,'run-review'],[two,'run-review'],['owned-command-canonical','run-hot-return'],['owned-command-trial','run-trial']].map(([name,mode])=>`<Login name="${name}" pw="${password}" mode="${mode}"><Booklet codes="Shared">ORACLE.POW.BOOK</Booklet></Login>`).join('')+`<Login name="${monitorName}" pw="${password}" mode="monitor-group"/></Group><Group id="OTHER.COMMAND" label="Other group"><Login name="owned-other-command" pw="${password}" mode="run-review"><Booklet codes="Shared">ORACLE.POW.BOOK</Booklet></Login></Group>`)});
   const authenticate=async name=>{const login=await services.originalAuthentication.login({name,password});return login.kind==='login'?{login,person:await services.originalAuthentication.person({loginToken:login.token,code:'Shared'})}:{person:login};};
   const owner=await authenticate(one),peer=await authenticate(two),foreign=await authenticate('owned-other-command'),monitor=await authenticate(monitorName);
   const create=(suffix,person=owner.person)=>services.originalTest.create({token:person.token,bookletName:'ORACLE.POW.BOOK#'+suffix});
@@ -209,8 +209,11 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    await timed.originalTest.read(read);
    const initial=await enter();
    assert.equal(initial.remainingMilliseconds,60000);
-   await assert.rejects(enter('interrupt'),error=>error.statusCode===409);
-   await assert.rejects(enter('cancel'),error=>error.statusCode===409);
+   for(const action of ['interrupt','cancel']){
+    await assert.rejects(enter(action),error=>error.errorCode==='native_timer_exit_forbidden');
+    await assert.rejects(timed.originalTest.enterTimer({...read,body:{unitAlias,action,expectedExitPhase:initial.exitPhase}}),
+     error=>error.errorCode==='native_timer_exit_forbidden');
+   }
 
    now=Date.parse(initial.startedAt)+5000;
    const pauseId=await control('pause');
@@ -260,6 +263,89 @@ for(const kind of kinds)test(`${kind}: real native command producer, queue and A
    assert.equal(cancelled.status,'cancelled');
    assert.equal(cancelled.remainingMilliseconds,0);
   });
+  for(const [action,login,leave] of [['cancel','owned-command-canonical','allowed'],['interrupt','owned-command-trial','forbidden']]){
+   await t.test(`a delayed ${action} leaves the reopened timer phase unchanged`,async()=>{
+    const bookletName='ORACLE.POW.PHASE.'+action.toUpperCase(),unitAlias='TIMED';
+    await upload('phase-'+action+'.xml',xml('Booklet',`<Metadata><Id>${bookletName}</Id><Label>Timer phase</Label></Metadata><Units><Testlet id="phase" label="Timed block"><Restrictions><TimeMax minutes="1" leave="${leave}"/></Restrictions><Unit id="ORACLE.POW.UNIT" alias="${unitAlias}" label="Timed Unit"/></Testlet></Units>`));
+    const {person}=await authenticate(login);
+    const testNumber=await services.originalTest.create({token:person.token,bookletName});
+    const read={token:person.token,testNumber,nativeStateProtocol:'1'};
+    const scope=await current(testNumber,person);
+    let now=Date.now(),sampled=0;
+    const clockService=()=>createFirstSliceServices({repository,now:()=>new Date(sampled=Math.max(now,sampled+1)).toISOString(),originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
+    let timed=clockService();
+    const timer=(body={action:'enter'},token=person.token)=>timed.originalTest.enterTimer({token,testNumber,body:{unitAlias,...body}});
+    const leaveRequest=clock=>({action,...(clock.exitPhase===undefined?{}:{expectedExitPhase:clock.exitPhase})});
+    const control=async(keyword,args=[])=>{
+     await send({keyword,arguments:args,timestamp:Math.floor(now/1000),testIds:[Number(testNumber)]});
+     const [pending]=await repository.listOriginalCommands(scope,null);
+     assert.equal((await timed.originalCommand.acknowledge({...read,commandNumber:pending.id})).reason,'OK');
+    };
+    const goto=()=>control('goto',['id',unitAlias,'| closed timeblock reopened - new remaining time 1']);
+    const snapshot=()=>run(testNumber,person);
+    const assertUnchanged=async(request)=>{
+     const before=await snapshot();
+     const persisted=before.originalResultState.nativeTestletTimers.phase;
+     const result=await timer(request);
+     const after=await snapshot();
+     assert.deepEqual(after.originalResultState.nativeTestletTimers,before.originalResultState.nativeTestletTimers,
+      new Date(now).toISOString()+' must preserve the complete timer inventory');
+     assert.deepEqual(after,before);
+     assert.equal(result.status,'running');
+     assert.equal(result.startedAt,persisted.startedAt);
+     assert.equal(result.expiresAt,persisted.expiresAt);
+     assert.equal(result.remainingMilliseconds,Date.parse(persisted.expiresAt)-sampled);
+     assert.equal(result.exitSuperseded,true);
+     t.diagnostic(JSON.stringify({action,unchanged:true,startedAt:persisted.startedAt,expiresAt:persisted.expiresAt,
+      storedRemainingSeconds:persisted.remainingSeconds,remainingMilliseconds:result.remainingMilliseconds}));
+    };
+    await timed.originalTest.read(read);
+    const initial=await timer();
+    const delayed=leaveRequest(initial);
+    now=Date.parse(initial.expiresAt)+1;
+    assert.equal((await timer({action:'expire'})).status,'expired');
+    await goto();
+    const reopened=await timer();
+    assert.equal(reopened.expiresAt,new Date(Date.parse(reopened.startedAt)+60000).toISOString());
+    now=Date.parse(reopened.startedAt)+750;
+    await close();await open();timed=clockService();
+    await assertUnchanged(delayed);
+    assert.notEqual(reopened.exitPhase,initial.exitPhase);
+
+    const fresh=leaveRequest(reopened);
+    await assert.rejects(timer(fresh,peer.person.token),error=>error.statusCode===403);
+    const exited=await timer(fresh);
+    const stopped=(await snapshot()).originalResultState.nativeTestletTimers.phase;
+    assert.equal(exited.status,action==='cancel'?'cancelled':'paused');
+    assert.equal(stopped.status,exited.status);
+    assert.equal(exited.expiresAt,null);
+    assert.equal(stopped.expiresAt,null);
+    assert.equal(exited.remainingMilliseconds,action==='cancel'?0:Date.parse(reopened.expiresAt)-Date.parse(stopped.updatedAt));
+    assert.equal(stopped.remainingSeconds,exited.remainingMilliseconds/1000);
+    assert.equal(stopped.pausedFromExpiresAt,action==='cancel'?undefined:reopened.expiresAt);
+    t.diagnostic(JSON.stringify({action,applied:true,status:stopped.status,expiresAt:stopped.expiresAt,remainingSeconds:stopped.remainingSeconds}));
+
+    await (action==='cancel'?goto():control('resume'));
+    const restored=await timer();
+    if(action==='interrupt')assert.equal(restored.startedAt,reopened.startedAt);
+    assert.notEqual(restored.exitPhase,reopened.exitPhase);
+    await assertUnchanged(fresh);
+    if(action==='cancel'){
+     const saved=await snapshot();
+     const {exitPhase:_,...legacyTimer}=saved.originalResultState.nativeTestletTimers.phase;
+     await repository.mutateParticipantRun(saved,({testRun})=>({
+      testRun,originalNativeTestletTimers:{phase:legacyTimer},testLogs:[],activityEvents:[]
+     }));
+     const legacyRun=await snapshot(),legacyClock=await timer();
+     assert.match(legacyClock.exitPhase,/^[a-f0-9]{64}$/);
+     assert.equal((await timer()).exitPhase,legacyClock.exitPhase);
+     assert.deepEqual(await snapshot(),legacyRun);
+     assert.equal((await timer(leaveRequest(legacyClock))).status,exited.status);
+    }else{
+     assert.equal((await timer({action})).status,exited.status,'Older clients can still perform an authorized exit');
+    }
+   });
+  }
   await t.test('an accepted native Resume can finish after reopening an untimed Test',async()=>{
    const {person}=await authenticate('owned-command-canonical');
    const testNumber=await create('untimed:resume-recovery',person);

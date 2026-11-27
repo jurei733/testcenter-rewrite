@@ -1,3 +1,4 @@
+import {createHash,randomUUID} from 'node:crypto';
 import {originalTestStateLogIdPrefix,originalTestLogIdPrefix,type ContentReleaseBookletEntry,type ParticipantSession,type TestRun} from '@testcenter-rewrite-app/domain';
 import type {FirstSliceRepository} from './index.js';
 import type {OriginalAuthenticationPort} from './original-authentication.js';
@@ -45,11 +46,16 @@ export type OriginalTestPort = {
   enterTimer(input:{token:string;testNumber:string;body:unknown}):Promise<{
     testletKey:string;status:OriginalNativeTestletTimer['status'];startedAt:string;expiresAt:string|null;remainingMilliseconds:number;
     displayCeilingSeconds?:number;
+    exitPhase?:string;
+    exitSuperseded?:true;
   }>;
   patchState(input:{token:string;testNumber:string;patch:unknown;deliveryId?:unknown;stateBase?:unknown}):Promise<OriginalNativeStateWriteResult|void>;
   resource(input:{groupToken:string;workspaceNumber:string;path:string}):Promise<{bytes:Uint8Array;contentType:string}>;
 };
 const unavailable = () => new FirstSliceError(409, 'original_test_history_unknown', 'The Original Test identity is unavailable.');
+// Existing running clocks can be bound without rewriting their stored state.
+const timerExitPhase = (timer:OriginalNativeTestletTimer):string => timer.exitPhase ??
+  createHash('sha256').update(JSON.stringify([timer.testletKey,timer.startedAt,timer.expiresAt])).digest('hex');
 
 /** Creation does not enter a controller, open a Test, save state or start timers. */
 export type OriginalTestCreationContext={repository:FirstSliceRepository;now:()=>string;id:()=>string;
@@ -114,7 +120,7 @@ export function createOriginalTestPort(input: {
   return {
     async enterTimer({token,testNumber:raw,body}){
       const{person,run,testNumber}=await owned(token,raw);
-      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['unitAlias','action','previousStartedAt','gotoCommandId','pausedDisplay'].includes(key))||
+      if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>!['unitAlias','action','previousStartedAt','gotoCommandId','pausedDisplay','expectedExitPhase'].includes(key))||
         !('unitAlias' in body)||typeof body.unitAlias!=='string'||!body.unitAlias||body.unitAlias.length>255){
         throw new FirstSliceError(400,'native_timer_entry_invalid','A native timer entry requires a Unit alias.');
       }
@@ -122,8 +128,11 @@ export function createOriginalTestPort(input: {
       const previousStartedAt='previousStartedAt' in body?body.previousStartedAt:undefined;
       const gotoCommandId='gotoCommandId' in body?body.gotoCommandId:undefined;
       const rawPausedDisplay='pausedDisplay' in body?body.pausedDisplay:undefined;
+      const expectedExitPhase='expectedExitPhase' in body?body.expectedExitPhase:undefined;
+      const isExit=action==='cancel'||action==='interrupt';
       if(typeof action!=='string'||!['enter','cancel','interrupt','expire','reenter'].includes(action)||
         (action==='reenter'?typeof previousStartedAt!=='string'||previousStartedAt.length>32:previousStartedAt!==undefined)||
+        expectedExitPhase!==undefined&&(!isExit||typeof expectedExitPhase!=='string'||!expectedExitPhase||expectedExitPhase.length>64)||
         gotoCommandId!==undefined&&(action!=='enter'||typeof gotoCommandId!=='string'||
           !/^[1-9][0-9]{0,18}$/.test(gotoCommandId)||BigInt(gotoCommandId)>9223372036854775807n)){
         throw new FirstSliceError(400,'native_timer_entry_invalid','Invalid native timer action.');
@@ -151,6 +160,7 @@ export function createOriginalTestPort(input: {
         throw new FirstSliceError(409,'native_timer_unavailable','The Unit has no authored time limit.');
       }
       let remainingMilliseconds=0;
+      let exitSuperseded=false;
       const result=await input.repository.mutateParticipantRun(run,({testRun})=>{
         unlocked(testRun,testNumber);
         const timestamp=input.now(),now=Date.parse(timestamp);
@@ -208,6 +218,10 @@ export function createOriginalTestPort(input: {
           if(!Number.isSafeInteger(remainingMilliseconds)){
             throw new FirstSliceError(409,'native_timer_unavailable','The saved timer deadline is unavailable.');
           }
+          if(current.status==='running'&&expectedExitPhase!==undefined&&expectedExitPhase!==timerExitPhase(current)){
+            exitSuperseded=true;
+            return null;
+          }
           if(current.status==='running'&&remainingMilliseconds===0&&!reopen){
             timer={...current,status:'expired',remainingSeconds:0,updatedAt:timestamp,endedAt:current.expiresAt??timestamp};
             if(running&&control&&mode.forceTimeRestrictions&&(action==='expire'||action==='enter')&&typeof activeAlias==='string'&&
@@ -219,7 +233,7 @@ export function createOriginalTestPort(input: {
                 timer.expirySuccessor={fromUnitAlias:activeAlias,unitAlias:nextAlias,parkedStartedAt:nextClock.startedAt,commandId:control.commandId};
               }
             }
-          }else if(current.status==='running'&&(action==='cancel'||action==='interrupt')){
+          }else if(current.status==='running'&&isExit){
             if(action==='cancel')remainingMilliseconds=0;
             const {displayCeilingSeconds: _,...stoppedClock}=current;
             timer={...stoppedClock,status:action==='cancel'?'cancelled':'paused',remainingSeconds:remainingMilliseconds/1000,
@@ -272,6 +286,7 @@ export function createOriginalTestPort(input: {
             ...(reopen?{reopenCommandId:control!.commandId}:{})
           };
         }
+        if(timer.status==='running')timer.exitPhase=randomUUID();
         const nextTimers={...timers,[block.key]:timer};
         if(lateGoto){
           for(const [key,clock] of Object.entries(timers)){
@@ -287,6 +302,8 @@ export function createOriginalTestPort(input: {
       const timer=result?.testRun.originalResultState?.nativeTestletTimers?.[block.key];
       if(!timer)throw forbidden(raw);
       return {testletKey:timer.testletKey,status:timer.status,startedAt:timer.startedAt,expiresAt:timer.expiresAt,remainingMilliseconds,
+        ...(timer.status==='running'?{exitPhase:timerExitPhase(timer)}:{}),
+        ...(exitSuperseded?{exitSuperseded:true as const}:{}),
         ...(action==='enter'&&timer.status==='running'&&timer.displayCeilingSeconds!==undefined
           ?{displayCeilingSeconds:timer.displayCeilingSeconds}:{})};
     },

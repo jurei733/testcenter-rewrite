@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
-import {BehaviorSubject,Subject,interval,timer,lastValueFrom,firstValueFrom,of,Observable,concat,defer,EMPTY} from 'rxjs';
-import {map,takeUntil,concatMap,expand,filter,ignoreElements,take,tap} from 'rxjs/operators';
+import {BehaviorSubject,Subject,interval,timer,lastValueFrom,firstValueFrom,of,Observable,concat,defer,EMPTY,from} from 'rxjs';
+import {map,takeUntil,concatMap,expand,filter,ignoreElements,take,tap,takeWhile,last} from 'rxjs/operators';
 import {TestScheduler} from 'rxjs/testing';
 
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/original-controller-timer-lifetime.json',import.meta.url),'utf8'));
@@ -154,43 +154,51 @@ function extractNativeMethods(file, className, names) {
 
 const nativeTimerSource = `
 export const load = ({firstValueFrom, concat, defer, EMPTY, timer, createTicker, performance, AppError, sessionStorage,
-  MaxTimerEvent, concatMap, expand, filter, ignoreElements, take, takeUntil, tap, UnitNavigationTarget, prepareNativePlayerHtml}) => {
+  MaxTimerEvent, concatMap, expand, filter, ignoreElements, take, takeUntil, tap, UnitNavigationTarget, prepareNativePlayerHtml,
+  from, of, map, last, lastValueFrom, takeWhile, PRIMARY_OUTLET}) => {
  class TimerData {
   ${extractNativeMethods('classes/test-controller.classes.ts', 'TimerData', ['constructor', 'displayedSeconds'])}
  }
  class NativeTestController {
   ${extractNativeMethods('services/test-controller.service.ts', 'TestControllerService',
     ['startTimer', 'consumePausedTimerDisplay', 'restoreResumedTimerDisplay', 'readPausedTimerDisplays', 'writePausedTimerDisplays', 'takePausedTimerDisplay',
-      'confirmTimerExpiry', 'finishTimer', 'cancelTimer', 'interruptTimer', 'leaveTimedBlock', 'resume', 'pause', 'executeGotoCommand', 'setUnitNavigationRequest'])}
+      'confirmTimerExpiry', 'finishTimer', 'cancelTimer', 'interruptTimer', 'prepareTimedBlockExit', 'resume', 'pause', 'executeGotoCommand', 'setUnitNavigationRequest',
+      'canDeactivateUnit', 'checkAndSolveCompleteness', 'checkAndSolveTimer', 'checkAndSolveLeaveLocks', 'resolveLeaveCheckResult',
+      'willAlsoEndTest', 'shouldShowConfirmationUI', 'terminateConfirmedLeave', 'terminateTest'])}
+ }
+ class NativeTimerBackend {
+  ${extractNativeMethods('services/backend.service.ts', 'BackendService', ['timer'])}
  }
  class NativeUnitHost {
   ${extractNativeMethods('components/unithost/unithost.component.ts', 'UnithostComponent', ['open', 'runUnit'])}
  }
- return {NativeTestController, NativeUnitHost};
+ return {NativeTestController, NativeTimerBackend, NativeUnitHost};
 };`;
 const nativeTimerOutput = ts.transpileModule(nativeTimerSource, {
  compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext},
 }).outputText;
 const nativeTimerModule = await import('data:text/javascript;base64,' + Buffer.from(nativeTimerOutput).toString('base64'));
 
-async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDisplay, savedResumed, expiresAt, nextClock,
- prepareNativePlayerHtml = async html => html}={}) {
+async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDisplay, savedResumed, expiresAt, exitPhase, nextClock,
+ prepareNativePlayerHtml = async html => html, pauseTarget = 'pause'}={}) {
  const scheduler = new TestScheduler(assert.deepEqual);
  const startedAt = '2026-11-25T12:00:00.000Z';
  const clock = {
   testletKey: 'timed', status: 'running', remainingMilliseconds, startedAt,
   expiresAt: expiresAt??new Date(Date.parse(startedAt)+remainingMilliseconds).toISOString(),
+  exitPhase,
  };
  const pausedTimerKey = 'owned-paused-timer';
  const resumedTimerKey = 'owned-resumed-timer';
  const savedTimers = new Map(savedDisplay ? [[pausedTimerKey, JSON.stringify(savedDisplay)]] : []);
  if(savedResumed)savedTimers.set(resumedTimerKey,JSON.stringify(savedResumed));
- const {NativeTestController, NativeUnitHost} = nativeTimerModule.load({
+ const {NativeTestController, NativeTimerBackend, NativeUnitHost} = nativeTimerModule.load({
   firstValueFrom, concat, defer, EMPTY, timer: delay => timer(delay, scheduler),
   createTicker: () => interval(100, scheduler), performance: {now: () => scheduler.now()}, AppError: Error,
   MaxTimerEvent: {STARTED: 'STARTED', STEP: 'STEP', ENDED: 'ENDED', INTERRUPTED: 'INTERRUPTED', CANCELLED: 'CANCELLED'},
   concatMap, expand, filter, ignoreElements, take, takeUntil, tap,
-  UnitNavigationTarget: {PAUSE:'pause'}, prepareNativePlayerHtml,
+  from, of, map, last, lastValueFrom, takeWhile, PRIMARY_OUTLET:'primary',
+  UnitNavigationTarget: {PAUSE:pauseTarget}, prepareNativePlayerHtml,
   sessionStorage: {getItem: key => savedTimers.get(key), setItem: (key, value) => savedTimers.set(key,value), removeItem: key => savedTimers.delete(key)},
  });
  const controller = new NativeTestController();
@@ -199,7 +207,7 @@ async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDi
  Object.assign(controller, {
   nativeCurrent: true, currentUnit: unit, testMode: {forceTimeRestrictions: true}, pausedTimerKey,resumedTimerKey,
   currentTimerId: '', timerRefreshId: 0, timerIntervalSubscription: null, timers$: new Subject(), owned: subscribe => subscribe(), mds: {},
-  bs: {timer: (_id, alias, action, _previousStartedAt, gotoCommandId, pausedDisplay) => {
+  bs: {timer: (_id, alias, action, {gotoCommandId,pausedDisplay}={}) => {
    if (action === 'enter') {
     entries.push({alias, gotoCommandId, pausedDisplay});
     return of(entries.length===1 ? clock : {...clock, ...nextClock});
@@ -216,7 +224,38 @@ async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDi
  });
  assert.equal(await controller.startTimer({id: 'timed'}, unit, false, () => true), true);
  const advance = frame => {scheduler.maxFrames = frame;scheduler.flush();};
- return {controller, NativeUnitHost, unit, clock, entries, expirations, events, advance, savedTimers, resumedTimerKey, pausedTimerKey};
+ return {controller, NativeTimerBackend, NativeUnitHost, unit, clock, entries, expirations, events, advance, savedTimers, resumedTimerKey, pausedTimerKey};
+}
+
+for(const [action,status,event] of [['cancel','cancelled','CANCELLED'],['interrupt','paused','INTERRUPTED']]){
+ test(`native ${action} sends its observed phase and consumes a superseded exit once`, async () => {
+  const {controller,NativeTimerBackend,unit,clock,events}=await nativeExpiryFixture([],{
+   exitPhase:'observed-phase',nextClock:{exitPhase:'new-phase'}
+  });
+  const backend=new NativeTimerBackend(),requests=[];
+  const enterBackend=controller.bs;
+  const superseded={...clock,exitPhase:'new-phase',exitSuperseded:true};
+  const accepted={...clock,status,expiresAt:null};
+  backend.backendUrl='/';
+  backend.http={patch:(path,body)=>{
+   requests.push({path,body:JSON.parse(JSON.stringify(body))});
+   return of(requests.length===1?superseded:accepted);
+  }};
+  controller.nativeTestId='42';
+  controller.bs=backend;
+  assert.equal(await controller.prepareTimedBlockExit(action)(),false);
+  assert.deepEqual(requests,[{path:'/test/42/timer',body:{unitAlias:'owned-unit',action,expectedExitPhase:'observed-phase'}}]);
+  assert.equal(controller.visibleTimer.exitPhase,clock.exitPhase);
+  assert.deepEqual(events,[[0,'STARTED']]);
+  controller.bs=enterBackend;
+  assert.equal(await controller.startTimer({id:'timed'},unit,false,()=>true),true);
+  controller.bs=backend;
+  assert.equal(await controller.prepareTimedBlockExit(action)(),true);
+  assert.equal(requests.length,2);
+  assert.equal(requests[1].body.expectedExitPhase,'new-phase');
+  assert.equal(controller.visibleTimer,undefined);
+  assert.deepEqual(events,[[0,'STARTED'],[0,'STARTED'],[0,event]]);
+ });
 }
 
 test('a reloaded timer restores the display only for the same server clock', async () => {
@@ -328,7 +367,7 @@ for (const pending of ['resources', 'resource error', 'timer reply', 'timer erro
    get: () => f.controller.units[f.controller.currentUnitSequenceId]
   });
   if (timerPending) f.controller.interruptTimer();
-  f.controller.bs.timer = (_id, alias, action, _previousStartedAt, commandId) => {
+  f.controller.bs.timer = (_id, alias, action, {gotoCommandId:commandId} = {}) => {
    timerRequests.push({alias,action,commandId});
    return timerReply;
   };
@@ -503,7 +542,7 @@ for (const [action, event] of [['cancel', 'CANCELLED'], ['interrupt', 'INTERRUPT
    assert.equal(requestedAction, action);
    return of({...f.clock, status:action === 'cancel' ? 'cancelled' : 'paused', expiresAt:null});
   };
-  await f.controller.leaveTimedBlock(action);
+  assert.equal(await f.controller.prepareTimedBlockExit(action)(),true);
   assert.equal(f.controller.currentTimerId, '');
   assert.equal(f.controller.timerIntervalSubscription, null);
   assert.deepEqual(f.events, [[0,'STARTED'],[0,event]]);
@@ -518,7 +557,7 @@ for (const [action, event] of [['cancel', 'CANCELLED'], ['interrupt', 'INTERRUPT
    requests.push([alias, requestedAction]);
    return requestedAction === action ? reply : of(reopened);
   };
-  const leaving = f.controller.leaveTimedBlock(action);
+  const leaving = f.controller.prepareTimedBlockExit(action)();
   // A Monitor jump can reopen the same timed block while the old reply is held.
   f.controller.interruptTimer();
   assert.equal(await f.controller.startTimer({id:'timed'}, f.unit, false, () => true), true);
@@ -526,12 +565,205 @@ for (const [action, event] of [['cancel', 'CANCELLED'], ['interrupt', 'INTERRUPT
   const eventsBeforeReply = f.events.slice();
 
   reply.next({...f.clock, status:action === 'cancel' ? 'cancelled' : 'paused', expiresAt:null});
-  await leaving;
+  assert.equal(await leaving,false);
 
   assert.deepEqual(requests, [[f.unit.alias,action],[f.unit.alias,'enter']]);
   assert.equal(f.controller.currentTimerId, 'timed');
   assert.equal(f.controller.timerIntervalSubscription, replacementTicker);
   assert.equal(f.controller.visibleTimer.expiresAt, reopened.expiresAt);
   assert.deepEqual(f.events, eventsBeforeReply);
+ });
+}
+
+async function nativeLeaveFixture({leave = 'confirm', enforceTime = true, lock, enforceLock = true} = {}) {
+ const f = await nativeExpiryFixture([], {
+  remainingMilliseconds:3000, exitPhase:'phase-a', nextClock:{exitPhase:'phase-b'}, pauseTarget:'#pause'
+ });
+ const {controller, unit, clock, NativeTimerBackend} = f;
+ const dialog = new Subject(), reply = new Subject();
+ const requests = [], dialogs = [], notices = [], writes = [];
+ const enterBackend = controller.bs;
+ const backend = new NativeTimerBackend();
+ backend.backendUrl = '/';
+ backend.http = {patch:(path, body) => {
+  if (body.action === 'enter') return enterBackend.timer('42', body.unitAlias, body.action, body);
+  requests.push({path, body:JSON.parse(JSON.stringify(body))});
+  return reply;
+ }};
+ backend.lockTest = (id, _timestamp, reason) => {
+  writes.push(['lockTest',id,reason]);
+  return of(true);
+ };
+ Object.assign(unit.parent, {
+  id:'timed', locked:null, restrictions:{timeMax:{leave}, lockAfterLeaving:lock}
+ });
+ Object.assign(controller, {
+  nativeTestId:'42', testId:'42', bs:backend, booklet:{config:{lock_test_on_termination:'ON'}},
+  state$:new BehaviorSubject('RUNNING'),
+  testMode:{forceTimeRestrictions:enforceTime, forceNaviRestrictions:enforceLock, saveResponses:true},
+  testlets:{timed:unit.parent},
+  units:{[unit.sequenceId]:unit, 3:{sequenceId:3, parent:{id:'untimed'}}},
+  checkCompleteness:() => [],
+  messageService:{showConfirmDialog:data => {dialogs.push(data);return dialog;}},
+  ms:{showSnackbar:text => notices.push(text)},
+  activateUnitLeaveLock:id => writes.push(['lockUnit',id]),
+  closeAllBuffers:async (reason, stage) => {writes.push(['buffers',reason,stage]);},
+  cts:{getCustomText:key => key, restoreDefault:() => writes.push(['restoreDefault'])},
+  router:{
+   getCurrentNavigation:() => null,
+   parseUrl:url => ({root:{children:{primary:{segments:url.split('/').slice(1).map(path => ({path}))}}}}),
+   navigate:async (path, options) => {writes.push(['navigate',path,options]);return true;}
+  }
+ });
+ const navigate = (endsTest = false) =>
+  firstValueFrom(controller.canDeactivateUnit(endsTest ? '/native-start' : '/native-test/42/u/3'));
+ const replace = async () => {
+  const ticker = controller.timerIntervalSubscription;
+  assert.equal(await controller.startTimer(unit.parent, unit, false, () => true, '101'), true);
+  assert.equal(f.entries.at(-1).gotoCommandId,'101');
+  assert.equal(controller.currentTimerId,clock.testletKey);
+  assert.equal(controller.visibleTimer.startedAt,clock.startedAt);
+  assert.equal(controller.visibleTimer.expiresAt,clock.expiresAt);
+  assert.equal(controller.visibleTimer.exitPhase,'phase-b');
+  assert.notEqual(controller.timerIntervalSubscription,ticker);
+ };
+ const accepted = action => reply.next({...clock, status:action === 'cancel' ? 'cancelled' : 'paused', expiresAt:null});
+ const superseded = () => reply.next({...clock, exitPhase:'phase-b', exitSuperseded:true});
+ return {...f, dialog, requests, dialogs, notices, writes, navigate, replace, accepted, superseded};
+}
+
+const timerExitRequest = (action, phase = 'phase-a') => ({
+ path:'/test/42/timer', body:{unitAlias:'owned-unit', action, expectedExitPhase:phase}
+});
+
+for (const endsTest of [false,true]) {
+ const target = endsTest ? 'test end' : 'internal navigation';
+
+ test(`native timer exit confirmation for ${target} cannot dispatch against the replacement phase`, async () => {
+  const f = await nativeLeaveFixture();
+  const pending = f.navigate(endsTest);
+  assert.equal(f.dialogs.length,1);
+  assert.deepEqual(f.requests,[]);
+  await f.replace();
+  const ticker = f.controller.timerIntervalSubscription;
+  f.dialog.next(false);
+  // The held server reply accepts B if the old dialog is allowed to send B.
+  if (f.requests.length) f.accepted('cancel');
+  const allowed = await pending;
+  assert.deepEqual({
+   requests:f.requests, allowed, phase:f.controller.visibleTimer?.exitPhase,
+   events:f.events, state:f.controller.state$.getValue(), writes:f.writes
+  }, {requests:[], allowed:false, phase:'phase-b', events:[[0,'STARTED'],[0,'STARTED']], state:'RUNNING', writes:[]});
+  assert.equal(f.controller.timerIntervalSubscription,ticker);
+ });
+
+ test(`native timer exit confirmation for ${target} stays denied after a delayed superseded reply`, async () => {
+  const f = await nativeLeaveFixture();
+  const pending = f.navigate(endsTest);
+  f.dialog.next(false);
+  assert.deepEqual(f.requests,[timerExitRequest('cancel')]);
+  const ticker = f.controller.timerIntervalSubscription;
+  f.advance(100);
+  f.superseded();
+  const allowed = await pending;
+  assert.deepEqual({allowed, state:f.controller.state$.getValue(), writes:f.writes, events:f.events},
+   {allowed:false, state:'RUNNING', writes:[], events:[[0,'STARTED']]});
+  assert.equal(f.controller.timerIntervalSubscription,ticker);
+  assert.deepEqual(f.notices,[]);
+ });
+
+ test(`native timer exit confirmation for ${target} succeeds for the same phase across a ticker step`, async () => {
+  const f = await nativeLeaveFixture();
+  const pending = f.navigate(endsTest);
+  assert.deepEqual(f.dialogs,[{
+   title:endsTest ? 'Sicher, dass du den Test beenden möchtest?' : 'booklet_warningLeaveTimerBlockTitle',
+   content:'booklet_warningLeaveTimerBlockTextPrompt', confirmText:'Hier bleiben', cancelText:'Trotzdem weiter'
+  }]);
+  const visible = f.controller.visibleTimer;
+  f.advance(100);
+  assert.notEqual(f.controller.visibleTimer,visible);
+  f.dialog.next(false);
+  assert.deepEqual(f.requests,[timerExitRequest('cancel')]);
+  f.accepted('cancel');
+  assert.equal(await pending,true);
+  assert.equal(f.controller.currentTimerId,'');
+  assert.deepEqual(f.events,[[0,'STARTED'],[100,'CANCELLED']]);
+  assert.equal(f.controller.state$.getValue(),endsTest ? 'TERMINATED' : 'RUNNING');
+  assert.deepEqual(f.writes,endsTest ? [
+   ['buffers','setUnitNavigationRequest(#pause NEXT',undefined],
+   ['buffers','terminateTest:BOOKLETLOCKEDbyTESTEE','saved'],
+   ['lockTest','42','BOOKLETLOCKEDbyTESTEE'],
+   ['navigate',['/r/starter'],{state:{force:true}}],
+   ['restoreDefault']
+  ] : []);
+ });
+}
+
+test('native timer exit confirmation cannot allow test end if a replacement wins before the accepted reply', async () => {
+ const f = await nativeLeaveFixture();
+ const pending = f.navigate(true);
+ f.dialog.next(false);
+ assert.deepEqual(f.requests,[timerExitRequest('cancel')]);
+ await f.replace();
+ const ticker = f.controller.timerIntervalSubscription;
+ f.accepted('cancel');
+ const allowed = await pending;
+ assert.deepEqual({allowed,state:f.controller.state$.getValue(),writes:f.writes,events:f.events},
+  {allowed:false,state:'RUNNING',writes:[],events:[[0,'STARTED'],[0,'STARTED']]});
+ assert.equal(f.controller.timerIntervalSubscription,ticker);
+});
+
+test('native timer exit confirmation leaves the timer alone when the participant stays', async () => {
+ const f = await nativeLeaveFixture();
+ const pending = f.navigate(true);
+ f.dialog.next(true);
+ assert.equal(await pending,false);
+ assert.deepEqual(f.requests,[]);
+ assert.deepEqual(f.writes,[]);
+ assert.equal(f.controller.visibleTimer.exitPhase,'phase-a');
+});
+
+const previewTimerNotice = 'Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.';
+for (const [action, leave, enforceTime] of [['cancel','allowed',true],['interrupt','confirm',false]]) {
+ const lock = {scope:'unit', confirm:true};
+
+ for (const outcome of ['superseded','accepted after replacement']) {
+  test(`native timer exit ${action} with ${outcome} denies navigation before the leave-lock check`, async () => {
+   const f = await nativeLeaveFixture({leave,enforceTime,lock});
+   const pending = f.navigate();
+   assert.deepEqual(f.requests,[timerExitRequest(action)]);
+   if (outcome === 'accepted after replacement') await f.replace();
+   const ticker = f.controller.timerIntervalSubscription;
+   if (outcome === 'superseded') f.superseded();
+   else f.accepted(action);
+   await settle();
+   // Let an incorrectly opened lock dialog complete so the regression reports its side effects.
+   if (f.dialogs.length) f.dialog.next(false);
+   const allowed = await pending;
+   assert.deepEqual({allowed,dialogs:f.dialogs,notices:f.notices,writes:f.writes},
+    {allowed:false,dialogs:[],notices:[],writes:[]});
+   assert.equal(f.controller.timerIntervalSubscription,ticker);
+   assert.equal(f.controller.visibleTimer.exitPhase,outcome === 'superseded' ? 'phase-a' : 'phase-b');
+  });
+ }
+
+ test(`native timer exit ${action} preserves the subsequent leave-lock confirmation`, async () => {
+  const f = await nativeLeaveFixture({leave,enforceTime,lock,enforceLock:enforceTime});
+  const pending = f.navigate();
+  assert.deepEqual(f.requests,[timerExitRequest(action)]);
+  assert.deepEqual(f.dialogs,[]);
+  f.accepted(action);
+  await settle();
+  assert.deepEqual(f.dialogs,[{
+   title:'booklet_warningLeaveTitle-unit', content:'booklet_warningLeaveTextPrompt-unit',
+   confirmText:'Hier bleiben', cancelText:'Trotzdem weiter'
+  }]);
+  assert.deepEqual(f.notices,enforceTime ? [] : [previewTimerNotice]);
+  assert.deepEqual(f.writes,[]);
+  f.dialog.next(false);
+  assert.equal(await pending,true);
+  assert.deepEqual(f.writes,enforceTime ? [['lockUnit',f.unit.sequenceId]] : []);
+  assert.deepEqual(f.notices,enforceTime ? [] : [previewTimerNotice,'unit würde im Testmodus nun gesperrt werden.']);
+  assert.deepEqual(f.events,[[0,'STARTED'],[0,enforceTime ? 'CANCELLED' : 'INTERRUPTED']]);
  });
 }

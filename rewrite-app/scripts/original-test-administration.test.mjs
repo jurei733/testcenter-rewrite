@@ -13,12 +13,14 @@ import {Pool,Client} from 'pg';
 import {DatabaseSync} from 'node:sqlite';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createFirstSliceServices,projectOriginalTestAdministration,formatOriginalTestAdministrationJson,prepareOriginalTestSelection,selectOriginalTestDeletion,parseOriginalWorkspaceNumber,originalExplicitWorkspaceAccess,prepareOriginalNativeTestSelection,readOriginalWorkspaceAdministrationCollection,decodeOriginalTestLogJson} from '@testcenter-rewrite-app/application';
+import {FirstSliceError} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
 import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
+import {handleOriginalWorkspaceHttp} from '../apps/api/dist/apps/api/src/original-workspace-http.js';
 const evidence=JSON.parse(await readFile(new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-administration-http/observations.json',import.meta.url),'utf8'));
 const sourceRow=label=>evidence.rows.find(r=>r.label===label),flatten=value=>Object.values(value).flat();
 function storedZipEntry(body,name){
@@ -38,6 +40,94 @@ function inventory(){
   }
  }return input;
 }
+test('native workspace lists confirm the current read scope before publishing the rows', async t => {
+ const scope={tenantId:'tenant-id',workspaceId:'workspace-id',tenantKey:'tenant',workspaceKey:'workspace'};
+ const access={token:'synthetic-admin',workspacePathSegment:'7',write:false};
+ for (const [path,service,readScope] of [
+  ['results','originalGroupResults',{...scope,groups:['group-a','group-b']}],
+  ['responses/detailed','originalTestAdministration',scope],
+ ]) await t.test(path,async () => {
+  const events=[];
+  const headers=new Map();
+  const handled=await handleOriginalWorkspaceHttp({
+   request:{method:'GET',headers:{authtoken:access.token}},
+   pathname:'/workspace/7/'+path,
+   searchParams:new URLSearchParams({groups:'group-a,group-b'}),
+   services:{
+    originalWorkspaceAdministration:{
+     async resolve(input){
+      assert.deepEqual(input,access);
+      await Promise.resolve();
+      events.push('resolved');
+      return {...scope};
+     },
+    },
+    [service]:{
+     async list(input){
+      assert.deepEqual(input,readScope);
+      events.push('listed');
+      return [];
+     },
+    },
+   },
+   propagateError:()=>false,
+   header:(name,value)=>headers.set(name,value),
+   raw:(...reply)=>events.push(reply),
+  });
+  assert.equal(handled,true);
+  assert.equal(headers.get('cache-control'),'private, no-store');
+  assert.deepEqual(events,['resolved','listed','resolved',[200,'[]','application/json']]);
+ });
+});
+test('native workspace lists omit selected rows when the final read scope is denied', async t => {
+ const scope={tenantId:'tenant-id',workspaceId:'workspace-id',tenantKey:'tenant',workspaceKey:'workspace'};
+ const access={token:'synthetic-admin',workspacePathSegment:'7',write:false};
+ const groupName='synthetic-group';
+ const results=[{groupName,groupLabel:'Synthetic results',bookletsStarted:1,
+  numUnitsMin:1,numUnitsMax:1,numUnitsTotal:1,numUnitsAvg:1,lastChange:1}];
+ const tests=[{name:groupName,sessions:[{loginName:'synthetic-test',groupName,
+  groupLabel:'Synthetic tests',code:'',nameSuffix:'',bookletName:'synthetic-booklet',bookletLabel:'Synthetic booklet'}]}];
+ const lostRoleMessage='Workspace `7` not found.';
+ const deniedScopes=[
+  ['lost role',()=>{
+   throw new FirstSliceError(404,'original_workspace_not_found',lostRoleMessage);
+  },lostRoleMessage],
+  ['different workspace',()=>({...scope,workspaceId:'other-workspace'}),'Workspace not found.'],
+ ];
+ for (const [path,service,rows] of [
+  ['results','originalGroupResults',results],
+  ['responses/detailed','originalTestAdministration',tests],
+ ]) {
+  for (const [condition,resolveAgain,message] of deniedScopes) await t.test(path+' · '+condition,async () => {
+   const events=[];
+   const headers=new Map();
+   let resolutionCount=0;
+   const handled=await handleOriginalWorkspaceHttp({
+    request:{method:'GET',headers:{authtoken:access.token}},
+    pathname:'/workspace/7/'+path,
+    services:{
+     originalWorkspaceAdministration:{
+      async resolve(input){
+       assert.deepEqual(input,access);
+       events.push('resolved');
+       resolutionCount+=1;
+       return resolutionCount===1 ? scope : resolveAgain();
+      },
+     },
+     [service]:{async list(){events.push('listed');return rows;}},
+    },
+    propagateError:()=>false,
+    header:(name,value)=>headers.set(name,value),
+    raw:(...reply)=>events.push(reply),
+   });
+   assert.equal(handled,true);
+   assert.deepEqual(events,['resolved','listed','resolved',[404,message,'text/html;charset=UTF-8']]);
+   assert.equal(headers.get('cache-control'),'private, no-store');
+   assert.equal(headers.get('Test-Mode'),'NO');
+   assert.match(headers.get('Error-ID'),/^error-[0-9a-f-]{36}$/);
+  });
+ }
+});
 test('native administration projection reproduces the actual grouped Source116 JSON bytes',()=>{
  const input=inventory();input.runs.reverse();input.numbers.reverse();
  assert.equal(formatOriginalTestAdministrationJson(projectOriginalTestAdministration(input)),sourceRow('exact-group-and-numeric-test-order').rawText);

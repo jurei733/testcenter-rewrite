@@ -17,6 +17,8 @@ export interface NativeTimerClock {
   startedAt: string;
   expiresAt: string | null;
   displayCeilingSeconds?: number;
+  exitPhase?: string;
+  exitSuperseded?: true;
 }
 
 @Injectable({
@@ -91,10 +93,13 @@ export class BackendService {
   }
 
   timer(testId: string, unitAlias: string, action: 'enter'|'cancel'|'interrupt'|'expire'|'reenter',
-    previousStartedAt?: string, gotoCommandId?: string,
-    pausedDisplay?: {startedAt:string;expiresAt:string;displayedSeconds:number}): Observable<NativeTimerClock> {
-    return this.http.patch<NativeTimerClock>(`${this.backendUrl}test/${testId}/timer`,
-      {unitAlias, action, previousStartedAt, gotoCommandId, pausedDisplay});
+    options?: {
+      previousStartedAt?: string;
+      gotoCommandId?: string;
+      pausedDisplay?: {startedAt:string;expiresAt:string;displayedSeconds:number};
+      expectedExitPhase?: string;
+    }): Observable<NativeTimerClock> {
+    return this.http.patch<NativeTimerClock>(`${this.backendUrl}test/${testId}/timer`, {unitAlias, action, ...options});
   }
 
   prepareUnitJournal(saving:boolean):Promise<void>{return this.http.prepareUnitJournal(saving);}

@@ -67,6 +67,7 @@
               <button mat-fab data-cy="add-workspace" aria-label="Arbeitsbereich hinzufügen" matTooltip="Arbeitsbereich hinzufügen"
                 [disabled]="directory.busy" (click)="addWorkspace()"><mat-icon originalAdministrationIcon name="add" /></button>
               <button mat-fab data-cy="delete-workspace" aria-label="Markierten Arbeitsbereich löschen" matTooltip="Markierten Arbeitsbereich löschen"
+                matTooltipClass="original-application-logo-tooltip"
                 [disabled]="directory.busy || !directory.selectedWorkspace" (click)="confirmAction('delete-workspace')"><mat-icon originalAdministrationIcon name="delete" /></button>
               <button mat-fab data-cy="rename-workspace" aria-label="Arbeitsbereich umbenennen" matTooltip="Arbeitsbereich umbenennen"
                 [disabled]="directory.busy || !directory.selectedWorkspace" (click)="renameWorkspace()"><mat-icon originalAdministrationIcon name="edit" /></button>

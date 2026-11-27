@@ -70,7 +70,7 @@ type LeaveCheckResult =
   // user just acknowledges (no real choice involved)
   | { kind: 'deny'; notify?: string; infoDialog?: { title: string; content: string } }
   // block unless the user explicitly confirms leaving
-  | { kind: 'confirm'; title: string; content: string; onConfirmed: () => string | undefined | Promise<void> };
+  | { kind: 'confirm'; title: string; content: string; onConfirmed: () => string | undefined | Promise<boolean> };
 
 interface PausedTimerDisplay {
   testletKey: string;
@@ -147,7 +147,7 @@ export class TestControllerService {
   timers: KeyValuePairNumber = {}; // TODO remove the redundancy with timers$
   currentTimerId = '';
   private timerUnitAlias?: string;
-  private visibleTimer?: { startedAt: string; expiresAt: string | null; data: TimerData };
+  private visibleTimer?: { startedAt: string; expiresAt: string | null; exitPhase?: string; data: TimerData };
   private timerRefreshId = 0;
   private pausedTimers?: PausedTimerDisplay[];
   private timerIntervalSubscription: Subscription | null = null;
@@ -569,11 +569,11 @@ export class TestControllerService {
       typeof saved.expiresAt==='string'&&saved.expiresAt.length<=32&&
       Number.isSafeInteger(saved.displayedSeconds)&&saved.displayedSeconds>=0
       ?{startedAt:saved.startedAt,expiresAt:saved.expiresAt,displayedSeconds:saved.displayedSeconds}:undefined;
-    let clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter',undefined,gotoCommandId,pausedHint),{defaultValue:null});
+    let clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'enter',{gotoCommandId,pausedDisplay:pausedHint}),{defaultValue:null});
     if(!current()||!clock)return false;
     if(clock.testletKey===testlet.id&&changedUnit&&!this.testMode.forceTimeRestrictions&&
       (clock.status==='expired'||clock.status==='cancelled')){
-      clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'reenter',clock.startedAt),{defaultValue:null});
+      clock=await firstValueFrom(this.bs.timer(this.nativeTestId,unit.alias,'reenter',{previousStartedAt:clock.startedAt}),{defaultValue:null});
       if(!current()||!clock)return false;
     }
     if(clock.testletKey!==testlet.id||!Number.isSafeInteger(clock.remainingMilliseconds)||clock.remainingMilliseconds<0){
@@ -583,7 +583,7 @@ export class TestControllerService {
     // In that case the existing subscription still owns the same deadline.
     const visible = this.visibleTimer;
     if (visible?.data.id === testlet.id && clock.status === 'running' && clock.remainingMilliseconds > 0 &&
-        visible.startedAt === clock.startedAt && visible.expiresAt === clock.expiresAt) {
+        visible.startedAt === clock.startedAt && visible.expiresAt === clock.expiresAt && visible.exitPhase === clock.exitPhase) {
       return true;
     }
     this.finishTimer();
@@ -604,7 +604,7 @@ export class TestControllerService {
       const remaining=Math.max(0,Math.ceil((deadline-performance.now())/1000));
       const displayBalance=resumedDisplayBudget===undefined?undefined:Math.min(remaining,resumedDisplayBudget-elapsedTicks);
       const data=new TimerData(remaining/60,testlet.id,type,displayBalance);
-      this.visibleTimer={startedAt:clock.startedAt,expiresAt:clock.expiresAt,data};
+      this.visibleTimer={startedAt:clock.startedAt,expiresAt:clock.expiresAt,exitPhase:clock.exitPhase,data};
       this.timers$.next(data);
     };
     this.currentTimerId = testlet.id;
@@ -734,17 +734,27 @@ export class TestControllerService {
     this.finishTimer();
   }
 
-  private async leaveTimedBlock(action: 'cancel' | 'interrupt'): Promise<void> {
+  private prepareTimedBlockExit(action: 'cancel' | 'interrupt'): () => Promise<boolean> {
     const alias = this.timerUnitAlias;
     const timerId = this.currentTimerId;
     const ticker = this.timerIntervalSubscription;
-    if (alias) {
-      await firstValueFrom(this.bs.timer(this.nativeTestId, alias, action), { defaultValue: null });
-    }
-    // A jump can reopen the same block with a new ticker before this reply arrives.
-    if (!this.nativeCurrent || timerId !== this.currentTimerId || ticker !== this.timerIntervalSubscription) return;
-    if (action === 'cancel') this.cancelTimer();
-    else this.interruptTimer();
+    const expectedExitPhase = this.visibleTimer?.exitPhase;
+    // A Monitor command can replace the same block's timer during the dialog or the request.
+    const ownsTimer = () => this.nativeCurrent && timerId === this.currentTimerId &&
+      ticker === this.timerIntervalSubscription && expectedExitPhase === this.visibleTimer?.exitPhase;
+
+    return async () => {
+      if (!ownsTimer()) return false;
+      if (alias) {
+        const result = await firstValueFrom(this.bs.timer(this.nativeTestId, alias, action, {
+          expectedExitPhase
+        }), { defaultValue: null });
+        if (result?.exitSuperseded || !ownsTimer()) return false;
+      }
+      if (action === 'cancel') this.cancelTimer();
+      else this.interruptTimer();
+      return true;
+    };
   }
 
   async terminateTest(logEntryKey: string, force: boolean, lockTest: boolean = false): Promise<boolean> {
@@ -1164,24 +1174,24 @@ export class TestControllerService {
       return of({ kind: 'allow' });
     }
 
-    // when time restrictions aren't enforced (test/preview mode), interrupt the timer and let the
-    // caller show an informational toast instead of actually blocking/asking
-    const allowWithNotice = (text: string): Observable<LeaveCheckResult> =>
-      from(this.leaveTimedBlock('interrupt')).pipe(map(()=>({kind:'allow',notify:text})));
+    const leaveWithoutConfirmation = (action: 'cancel' | 'interrupt', notify?: string): Observable<LeaveCheckResult> =>
+      defer(this.prepareTimedBlockExit(action)).pipe(
+        map(allowed => allowed ? { kind: 'allow', notify } : { kind: 'deny' })
+      );
 
     if (this.testlets[this.currentTimerId].restrictions.timeMax?.leave === 'forbidden') {
       if (!this.testMode.forceTimeRestrictions) {
-        return allowWithNotice('Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.');
+        return leaveWithoutConfirmation('interrupt', 'Im Testmodus wäre die Navigation vor Ablauf der Zeit nicht möglich.');
       }
       return of({ kind: 'deny', notify: 'Es darf erst weiter geblättert werden, wenn die Zeit abgelaufen ist.' });
     }
 
     if (this.testlets[this.currentTimerId].restrictions.timeMax?.leave === 'allowed') {
-      return from(this.leaveTimedBlock('cancel')).pipe(map(()=>({kind:'allow'})));
+      return leaveWithoutConfirmation('cancel');
     }
 
     if (!this.testMode.forceTimeRestrictions) {
-      return allowWithNotice(
+      return leaveWithoutConfirmation('interrupt',
         'Im normalen Testablauf wird beim Verlassen des zeitbegrenzten Blocks eine Warnung angezeigt.'
       );
     }
@@ -1190,7 +1200,7 @@ export class TestControllerService {
       kind: 'confirm',
       title: this.cts.getCustomText('booklet_warningLeaveTimerBlockTitle'),
       content: this.cts.getCustomText('booklet_warningLeaveTimerBlockTextPrompt'),
-      onConfirmed: () => this.leaveTimedBlock('cancel')
+      onConfirmed: this.prepareTimedBlockExit('cancel')
     });
   }
 
@@ -1291,9 +1301,12 @@ export class TestControllerService {
             if (cdresult !== false) {
               return false; // user chose "Hier bleiben" - stay
             }
-            const followUpNotify = await result.onConfirmed();
-            if (followUpNotify) {
-              this.ms.showSnackbar(followUpNotify);
+            const confirmation = await result.onConfirmed();
+            if (confirmation === false) {
+              return false;
+            }
+            if (typeof confirmation === 'string' && confirmation) {
+              this.ms.showSnackbar(confirmation);
             }
             if (!alsoEndsTest) {
               return true;

@@ -1245,6 +1245,8 @@ export type OriginalTestResultState = {
 };
 
 export type OriginalNativeTestletTimer = TestletTimerState & {
+  /** A new identity for each running interval, including a resumed interval. */
+  exitPhase?: string;
   reopenCommandId?: string;
   parkedByGoto?: true;
   /** The restored display balance for this running interval. It never grants time. */

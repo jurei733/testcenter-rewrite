@@ -211,9 +211,13 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
         const selection=originalReportQuery(input.searchParams??new URLSearchParams(),'groups');
         if(selection===null)throw new FirstSliceError(500,'original_result_query_invalid','Internal error.');
         const rows=await input.services.originalGroupResults.list({...scope,groups:selection===''?undefined:selection.split(',')});
-        input.raw(200,encodeOriginalReportJson(rows),'application/json');return true;
+        const body=encodeOriginalReportJson(rows);
+        await confirmScope();
+        input.raw(200,body,'application/json');return true;
       }
-      input.raw(200,formatOriginalTestAdministrationJson(await input.services.originalTestAdministration.list(scope)),'application/json');return true;
+      const body=formatOriginalTestAdministrationJson(await input.services.originalTestAdministration.list(scope));
+      await confirmScope();
+      input.raw(200,body,'application/json');return true;
     }
     const body=await readJson(decodeOriginalTestLogJson);
     await input.services.originalWorkspaceAdministration.delete({token,workspacePathSegment:match[1]!,kind:match[2]==='responses'?'groups':'tests',body});
