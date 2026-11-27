@@ -1,5 +1,6 @@
 import {handleOriginalAssetHttp,originalAssetRouteLabel} from './original-asset-http.js';
 import {handleOriginalSystemCheckHttp,originalSystemCheckRouteLabel} from './original-system-check-http.js';
+import { isOriginalSystemConfigPath, projectOriginalSystemConfig } from "./original-system-config.js";
 import {handleOriginalAdminHttp,originalAdminRouteLabel} from './original-admin-http.js';
 import {handleOriginalWorkspaceHttp,originalWorkspaceRouteLabel} from './original-workspace-http.js';
 import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
@@ -3391,6 +3392,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `GET ${productionApiRoutes.system.getTime}`;
   }
 
+  if (isOriginalSystemConfigPath(pathname)) {
+    return `${method} /system/config`;
+  }
+
   if (
     method === "GET" &&
     pathname === productionApiRoutes.system.getBugReportConfig
@@ -4781,6 +4786,28 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           status: "ok",
           phase: "production-baseline"
         });
+        return;
+      }
+
+      if (isOriginalSystemConfigPath(pathname)) {
+        response.setHeader("cache-control", "no-store");
+        if (method === "OPTIONS") {
+          response.writeHead(200, { ...securityHeaders, allow: "GET, HEAD, OPTIONS" });
+          endResponse(response);
+          return;
+        }
+        if (request.method !== "GET") {
+          response.setHeader("allow", "GET, HEAD, OPTIONS");
+          sendError(response, 405, "original_method_not_allowed", "Method not allowed. Must be one of: GET");
+          return;
+        }
+        const settings = await services.applicationSettings.getApplicationSettings();
+        sendJson(response, 200, projectOriginalSystemConfig({
+          request, pathname, settings, commitSha: runtime.build.commitSha,
+          challengeScopes: runtime.config.proofOfWork.enabledScopes,
+          passwordPolicy: runtime.config.adminPasswordPolicy,
+          timeZone: runtime.config.participantAccessTimeZone
+        }));
         return;
       }
 

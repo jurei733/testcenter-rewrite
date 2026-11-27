@@ -21,6 +21,7 @@ import {
   type AdminSignInResponse,
   type BootstrapAdminUserResponse,
   type CreateAdminUserResponse,
+  type GetApplicationSettingsResponse,
   type GetRuntimeConfigResponse,
   type GetSystemTimeResponse,
   type ListSourcePackagesResponse,
@@ -871,6 +872,114 @@ test("protected compatibility intake rejects malformed SysCheck end tags without
       assert.equal(stored.body.sourcePackageDetail.sourcePackage.status, malformed ? "rejected" : "accepted");
     }
   } finally { await closeServer(isolated.server); }
+});
+
+test("native public system config projects bootstrap settings and safe notice HTML", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false",
+    FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME: "",
+    FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "",
+    FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE: "",
+    FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH: "10",
+    FIRST_SLICE_ADMIN_PASSWORD_PATTERN: ".*[0-9].*",
+    FIRST_SLICE_PARTICIPANT_TIME_ZONE: "Europe/Berlin",
+    FIRST_SLICE_PROOF_OF_WORK_SCOPES: "participant,second_code",
+    FIRST_SLICE_PROOF_OF_WORK_SECRET: "owned-bootstrap-config-proof-secret-1234567890",
+    FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET: "",
+    APP_BUILD_SHA: "123456789abc123456789abc123456789abc1234"
+  });
+  const get = (pathname: string, headers: Record<string, string> = {}) =>
+    requestJsonAt<Record<string, unknown>>(isolated.baseUrl, pathname, { headers });
+  try {
+    const initial = await get("/system/config");
+    assert.equal(initial.status, 200);
+    assert.match(initial.headers.get("content-type") ?? "", /^application\/json/);
+    assert.equal(initial.headers.get("cache-control"), "no-store");
+    assert.deepEqual(Object.keys(initial.body).sort(), [
+      "appConfig", "baseUrl", "broadcastingServiceUri", "bruteForceProtection", "customTexts",
+      "fileServiceUri", "iqbStandardResponseTypeMax", "iqbStandardResponseTypeMin",
+      "passwordMinLength", "passwordPattern", "supportedBrowsers", "veronaPlayerApiVersionMax",
+      "veronaPlayerApiVersionMin", "version", "xmlSchemaVersions"
+    ]);
+    assert.equal(initial.body.baseUrl, isolated.baseUrl);
+    assert.equal(initial.body.version, "Rewrite 123456789abc");
+    assert.equal(initial.body.veronaPlayerApiVersionMin, 2);
+    assert.equal(initial.body.veronaPlayerApiVersionMax, 6);
+    assert.equal(initial.body.iqbStandardResponseTypeMin, 1);
+    assert.equal(initial.body.iqbStandardResponseTypeMax, 1);
+    assert.deepEqual(initial.body.bruteForceProtection, ["login", "person"]);
+    assert.deepEqual(initial.body.customTexts, {});
+    assert.equal(initial.body.passwordMinLength, 10);
+    assert.equal(initial.body.passwordPattern, ".*[0-9].*");
+    assert.equal(initial.body.broadcastingServiceUri, "");
+    assert.equal(initial.body.fileServiceUri, "");
+    assert.deepEqual(initial.body.xmlSchemaVersions, {
+      Booklet: { repo: "testcenter-booklet-xml", min: 18, max: 18 },
+      Unit: { repo: "unit-xml", min: 17, max: 17 },
+      Testtakers: { repo: "testcenter-testtaker-xml", min: 17, max: 18 },
+      SysCheck: { repo: "testcenter-syscheck-xml", min: 18, max: 18 }
+    });
+    assert.ok(Array.isArray(initial.body.supportedBrowsers) && initial.body.supportedBrowsers.length > 0);
+    const aliased = await get("/api/system/config", {
+      AuthToken: "irrelevant-to-public-config",
+      "x-forwarded-host": "untrusted.example",
+      "x-forwarded-proto": "https",
+      "x-forwarded-prefix": "/untrusted"
+    });
+    assert.deepEqual(aliased.body, { ...initial.body, baseUrl: isolated.baseUrl + "/api" });
+    const head = await fetch(isolated.baseUrl + "/system/config", { method: "HEAD" });
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get("cache-control"), "no-store");
+    assert.equal(await head.text(), "");
+    const options = await fetch(isolated.baseUrl + "/system/config", { method: "OPTIONS" });
+    assert.equal(options.status, 200);
+    assert.equal(options.headers.get("allow"), "GET, HEAD, OPTIONS");
+    assert.equal(await options.text(), "");
+    const post = await fetch(isolated.baseUrl + "/system/config", { method: "POST" });
+    assert.equal(post.status, 405);
+
+    const credential = { username: "owned.config-admin", password: "OwnedConfig123!" };
+    const bootstrap = await requestJsonAt(isolated.baseUrl, productionApiRoutes.admin.bootstrap, {
+      method: "POST", body: credential
+    });
+    assert.equal(bootstrap.status, 201);
+    const signIn = await requestJsonAt<AdminSignInResponse>(
+      isolated.baseUrl, productionApiRoutes.admin.signIn, { method: "POST", body: credential }
+    );
+    assert.equal(signIn.status, 200);
+    const unsafeNotice = '<p onclick="run()">Legal &amp; <strong>details</strong> ' +
+      '<a href="mailto:privacy@example.test">contact</a> ' +
+      '<a href="jav&#x61;script:run()">bad link</a><script>hidden script</script>' +
+      '<svg onload="run()"><text>foreign</text></svg></p>';
+    const update = await requestJsonAt<GetApplicationSettingsResponse>(
+      isolated.baseUrl, productionApiRoutes.admin.patchOriginalApplicationSettings, {
+        method: "PATCH",
+        headers: { authorization: `Bearer ${signIn.body.sessionToken}` },
+        body: {
+          appTitle: "Owned display", themeName: "Sekundar", legalNoticeHtml: unsafeNotice,
+          privacyNotice: "<p>Privacy</p>", accessibilityNotice: "<p>Access</p>",
+          customTexts: { login_subtitle: "Owned public text" },
+          globalWarningText: "Owned maintenance", globalWarningExpiresAt: "2050-06-12T17:00:00Z"
+        }
+      }
+    );
+    assert.equal(update.status, 200);
+    assert.equal(update.body.applicationSettings.legalNoticeHtml, unsafeNotice);
+    const current = await get("/system/config");
+    assert.deepEqual(current.body.customTexts, { login_subtitle: "Owned public text" });
+    assert.deepEqual(current.body.appConfig, {
+      appTitle: "Owned display", themeName: "Sekundar", privacyNotice: "<p>Privacy</p>",
+      accessibilityNotice: "<p>Access</p>", legalNoticeHtml:
+        '<p>Legal &amp; <strong>details</strong> <a href="mailto:privacy@example.test">contact</a> <a>bad link</a></p>',
+      globalWarningText: "Owned maintenance", globalWarningExpiredDay: "2050-06-12",
+      globalWarningExpiredHour: "19"
+    });
+    assert.doesNotMatch(JSON.stringify(current.body), /currentKeyId|proof-secret|updatedByAdminUserId|assetAssignments/);
+  } finally {
+    await closeServer(isolated.server);
+  }
 });
 
 test("Original 19 strict XSD intake validates imports and cannot be bypassed by contentStructure", async () => {
