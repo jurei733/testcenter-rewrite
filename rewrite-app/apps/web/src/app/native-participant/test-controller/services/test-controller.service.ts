@@ -734,11 +734,16 @@ export class TestControllerService {
     this.finishTimer();
   }
 
-  private async leaveTimedBlock(action:'cancel'|'interrupt'): Promise<void> {
-    const alias=this.timerUnitAlias,timerId=this.currentTimerId;
-    if(alias)await firstValueFrom(this.bs.timer(this.nativeTestId,alias,action),{defaultValue:null});
-    if(!this.nativeCurrent||timerId!==this.currentTimerId)return;
-    if(action==='cancel')this.cancelTimer();
+  private async leaveTimedBlock(action: 'cancel' | 'interrupt'): Promise<void> {
+    const alias = this.timerUnitAlias;
+    const timerId = this.currentTimerId;
+    const ticker = this.timerIntervalSubscription;
+    if (alias) {
+      await firstValueFrom(this.bs.timer(this.nativeTestId, alias, action), { defaultValue: null });
+    }
+    // A jump can reopen the same block with a new ticker before this reply arrives.
+    if (!this.nativeCurrent || timerId !== this.currentTimerId || ticker !== this.timerIntervalSubscription) return;
+    if (action === 'cancel') this.cancelTimer();
     else this.interruptTimer();
   }
 
@@ -768,7 +773,7 @@ export class TestControllerService {
       gotoTarget = params[0];
     }
     if (gotoTarget && gotoTarget !== '0') {
-      this.timerRefreshId += 1;
+      const entryId = ++this.timerRefreshId;
       const targetUnit = this.units[parseInt(gotoTarget, 10)];
       if (targetUnit) {
         if (targetUnit.parent.timerId !== this.currentUnit?.parent.timerId) {
@@ -779,7 +784,12 @@ export class TestControllerService {
         targetUnit.lockedAfterLeaving = false;
         this.clearCodeLock(targetUnit.parent.id);
       }
-      const gotoEntry=commandId&&targetUnit?{commandId,unitSequenceId:targetUnit.sequenceId}:undefined;
+      // The destination may still be loading while a later command takes control.
+      const gotoEntry: UnitEntryNavigation | undefined = targetUnit ? {
+        commandId,
+        unitSequenceId: targetUnit.sequenceId,
+        ownsGoto: () => this.timerRefreshId === entryId && this.state$.getValue() === 'RUNNING'
+      } : undefined;
       return this.setUnitNavigationRequest(gotoTarget, true, gotoEntry);
     }
     return Promise.reject();
@@ -823,7 +833,7 @@ export class TestControllerService {
     default:
       const targetIsCurrent = this.currentUnitSequenceId.toString(10) === navString;
       let reload = Date.now() >> 11;
-      if (unitEntry?.refreshTimer) {
+      if (unitEntry?.refreshTimer || unitEntry?.ownsGoto) {
         reload = Date.now();
         if (this.router.parseUrl(this.router.url).queryParams['reload'] === String(reload)) reload += 1;
       }
@@ -837,7 +847,7 @@ export class TestControllerService {
         }
       )
         .then(navOk => {
-          if (!navOk && !targetIsCurrent) {
+          if (!navOk && !targetIsCurrent && unitEntry?.ownsGoto?.() !== false) {
             // happens when a goto goes to a unit which does exist, but is not accessible
             if (this.shouldShowConfirmationUI()) {
               this.ms.showSnackbar(`Navigation zu ${navString} nicht erlaubt.`);

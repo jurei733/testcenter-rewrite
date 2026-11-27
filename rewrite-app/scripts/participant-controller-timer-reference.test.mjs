@@ -161,10 +161,10 @@ export const load = ({firstValueFrom, concat, defer, EMPTY, timer, createTicker,
  class NativeTestController {
   ${extractNativeMethods('services/test-controller.service.ts', 'TestControllerService',
     ['startTimer', 'consumePausedTimerDisplay', 'restoreResumedTimerDisplay', 'readPausedTimerDisplays', 'writePausedTimerDisplays', 'takePausedTimerDisplay',
-      'confirmTimerExpiry', 'finishTimer', 'interruptTimer', 'resume', 'pause'])}
+      'confirmTimerExpiry', 'finishTimer', 'cancelTimer', 'interruptTimer', 'leaveTimedBlock', 'resume', 'pause', 'executeGotoCommand', 'setUnitNavigationRequest'])}
  }
  class NativeUnitHost {
-  ${extractNativeMethods('components/unithost/unithost.component.ts', 'UnithostComponent', ['runUnit'])}
+  ${extractNativeMethods('components/unithost/unithost.component.ts', 'UnithostComponent', ['open', 'runUnit'])}
  }
  return {NativeTestController, NativeUnitHost};
 };`;
@@ -188,7 +188,7 @@ async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDi
  const {NativeTestController, NativeUnitHost} = nativeTimerModule.load({
   firstValueFrom, concat, defer, EMPTY, timer: delay => timer(delay, scheduler),
   createTicker: () => interval(100, scheduler), performance: {now: () => scheduler.now()}, AppError: Error,
-  MaxTimerEvent: {STARTED: 'STARTED', STEP: 'STEP', ENDED: 'ENDED', INTERRUPTED: 'INTERRUPTED'},
+  MaxTimerEvent: {STARTED: 'STARTED', STEP: 'STEP', ENDED: 'ENDED', INTERRUPTED: 'INTERRUPTED', CANCELLED: 'CANCELLED'},
   concatMap, expand, filter, ignoreElements, take, takeUntil, tap,
   UnitNavigationTarget: {PAUSE:'pause'}, prepareNativePlayerHtml,
   sessionStorage: {getItem: key => savedTimers.get(key), setItem: (key, value) => savedTimers.set(key,value), removeItem: key => savedTimers.delete(key)},
@@ -290,6 +290,111 @@ test('a late expiry response for a replaced server deadline cannot advance the o
  fixture.controller.interruptTimer();
 });
 
+for (const pending of ['resources', 'resource error', 'timer reply', 'timer error', 'player preparation']) {
+ test(`a newer Pause retires the pending owned GOTO ${pending}`, async () => {
+  let prepare, readyToPrepare, finishPause;
+  const prepared = new Promise(resolve => {prepare = resolve;});
+  const preparing = new Promise(resolve => {readyToPrepare = resolve;});
+  const pausedNavigation = new Promise(resolve => {finishPause = resolve;});
+  const f = await nativeExpiryFixture([], {remainingMilliseconds: 3000,
+   prepareNativePlayerHtml: () => {readyToPrepare(); return prepared;}});
+  const timerPending = pending === 'timer reply' || pending === 'timer error';
+  const resourcePending = pending === 'resources' || pending === 'resource error';
+  const destination = {...f.unit, alias:'owned-destination', sequenceId:3, parent:{...f.unit.parent, id:'timed'}};
+  const resources = new Subject();
+  const timerReply = new Subject();
+  const timerRequests = [];
+  let navigationInfo, entering, preparations = 0, mounted = 0;
+  Object.assign(f.controller, {
+   currentUnitSequenceId: f.unit.sequenceId,
+   state$: new BehaviorSubject('RUNNING'),
+   unitContentReady$: new Subject(),
+   units: {[f.unit.sequenceId]:f.unit, [destination.sequenceId]:destination},
+   unitAliasMap: {[destination.alias]:destination.sequenceId},
+   testlets: {timed:{id:'timed'}},
+   updateSingleLock: () => {},
+   clearCodeLock: () => {},
+   unitBlockResourcesLoaded$: () => resources,
+   getPlayer: () => 'owned player',
+   updateNavigationState: () => {},
+   setUnitNavigationRequest: async (target, _force, entry) => {
+    if (target === 'pause') return pausedNavigation;
+    assert.equal(target, String(destination.sequenceId));
+    navigationInfo = entry;
+    return true;
+   }
+  });
+  Object.defineProperty(f.controller,'currentUnit',{
+   get: () => f.controller.units[f.controller.currentUnitSequenceId]
+  });
+  if (timerPending) f.controller.interruptTimer();
+  f.controller.bs.timer = (_id, alias, action, _previousStartedAt, commandId) => {
+   timerRequests.push({alias,action,commandId});
+   return timerReply;
+  };
+  const host = new f.NativeUnitHost();
+  Object.assign(host, {
+   tcs:f.controller, unitEntry:0, subscriptions:{},
+   router:{currentNavigation:()=>({extras:{info:navigationInfo}})},
+   pageService:{updateValidPages:()=>{}},
+   mds:{http:{isCurrent:true},appSubTitle$:new Subject()},
+   iFrameHostElement:{nativeElement:{hasChildNodes:()=>false}},
+   prepareUnit:()=>{preparations++;entering=host.runUnit();},
+   prepareIframe:()=>{mounted++;}
+  });
+  await f.controller.executeGotoCommand(['id',destination.alias], '101');
+  host.open(destination.sequenceId);
+  if (!resourcePending) resources.complete();
+  if (pending === 'player preparation') await preparing;
+  assert.deepEqual(timerRequests,timerPending ? [{alias:destination.alias,action:'enter',commandId:'101'}] : []);
+  const pausing = f.controller.pause();
+  assert.equal(f.controller.state$.getValue(),'PAUSED');
+  assert.equal(f.controller.currentTimerId,'');
+  if (pending === 'resources') resources.complete();
+  if (pending === 'resource error') resources.error(new Error('late owned resource error'));
+  if (pending === 'timer error') timerReply.error(new Error('late owned timer error'));
+  if (pending === 'timer reply') timerReply.next(f.clock);
+  prepare('owned player');
+  assert.equal(preparations,resourcePending ? 0 : 1);
+  await entering;
+  assert.equal(f.controller.currentTimerId,'');
+  assert.equal(f.controller.timerIntervalSubscription,null);
+  assert.equal(host.mds.appError,undefined);
+  assert.equal(mounted,0);
+  finishPause(true);
+  await pausing;
+ });
+}
+
+
+test('two same-Unit GO TO requests use distinct reloads and retire the first entry', async () => {
+ const f = await nativeExpiryFixture([], {remainingMilliseconds:3000});
+ const navigations = [];
+ Object.assign(f.controller, {
+  booklet:{config:{}}, currentUnitSequenceId:f.unit.sequenceId,
+  state$:new BehaviorSubject('RUNNING'),
+  units:{[f.unit.sequenceId]:f.unit},
+  unitAliasMap:{[f.unit.alias]:f.unit.sequenceId},
+  updateSingleLock:()=>{},
+  clearCodeLock:()=>{},
+  router:{
+   url:'/native-test/1/u/2',
+   parseUrl:()=>({queryParams:{reload:String(navigations.at(-1)?.queryParams.reload)}}),
+   navigate:(_target,options)=>{navigations.push(options);return Promise.resolve(true);}
+  }
+ });
+ const beginning=Date.now();
+ await f.controller.executeGotoCommand(['id',f.unit.alias], '101');
+ const first=navigations[0];
+ assert.equal(first.info.ownsGoto(),true);
+ await f.controller.executeGotoCommand(['id',f.unit.alias], '102');
+ const second=navigations[1];
+ assert.ok(first.queryParams.reload>=beginning);
+ assert.notEqual(first.queryParams.reload,second.queryParams.reload);
+ assert.equal(first.info.ownsGoto(),false);
+ assert.equal(second.info.ownsGoto(),true);
+});
+
 test('native Resume requests timed Unit entry even when its old countdown is still active', async () => {
  const deadline = '2026-11-25T12:00:18.000Z';
  const f = await nativeExpiryFixture([{status:'expired', remainingMilliseconds:0, expiresAt:deadline}],
@@ -387,5 +492,46 @@ for (const pending of ['timer reply', 'timer error', 'player preparation']) {
   assert.equal(mounted, 0);
   finishPause(true);
   await pausing;
+ });
+}
+
+for (const [action, event] of [['cancel', 'CANCELLED'], ['interrupt', 'INTERRUPTED']]) {
+ test(`a current ${action} reply retires its own timer`, async () => {
+  const f = await nativeExpiryFixture([], {remainingMilliseconds: 3000});
+  f.controller.bs.timer = (_id, alias, requestedAction) => {
+   assert.equal(alias, f.unit.alias);
+   assert.equal(requestedAction, action);
+   return of({...f.clock, status:action === 'cancel' ? 'cancelled' : 'paused', expiresAt:null});
+  };
+  await f.controller.leaveTimedBlock(action);
+  assert.equal(f.controller.currentTimerId, '');
+  assert.equal(f.controller.timerIntervalSubscription, null);
+  assert.deepEqual(f.events, [[0,'STARTED'],[0,event]]);
+ });
+
+ test(`a delayed ${action} reply cannot retire a replacement clock for the same timed block`, async () => {
+  const f = await nativeExpiryFixture([], {remainingMilliseconds: 3000});
+  const reply = new Subject();
+  const reopened = {...f.clock, startedAt:'2026-11-25T12:00:10.000Z', expiresAt:'2026-11-25T12:00:13.000Z'};
+  const requests = [];
+  f.controller.bs.timer = (_id, alias, requestedAction) => {
+   requests.push([alias, requestedAction]);
+   return requestedAction === action ? reply : of(reopened);
+  };
+  const leaving = f.controller.leaveTimedBlock(action);
+  // A Monitor jump can reopen the same timed block while the old reply is held.
+  f.controller.interruptTimer();
+  assert.equal(await f.controller.startTimer({id:'timed'}, f.unit, false, () => true), true);
+  const replacementTicker = f.controller.timerIntervalSubscription;
+  const eventsBeforeReply = f.events.slice();
+
+  reply.next({...f.clock, status:action === 'cancel' ? 'cancelled' : 'paused', expiresAt:null});
+  await leaving;
+
+  assert.deepEqual(requests, [[f.unit.alias,action],[f.unit.alias,'enter']]);
+  assert.equal(f.controller.currentTimerId, 'timed');
+  assert.equal(f.controller.timerIntervalSubscription, replacementTicker);
+  assert.equal(f.controller.visibleTimer.expiresAt, reopened.expiresAt);
+  assert.deepEqual(f.events, eventsBeforeReply);
  });
 }

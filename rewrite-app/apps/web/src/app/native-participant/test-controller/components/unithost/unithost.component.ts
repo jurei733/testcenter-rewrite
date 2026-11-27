@@ -53,6 +53,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
   private unitEntry=0;
   private gotoCommandId:string|undefined;
   private changedUnit=false;
+  private ownsGoto?: () => boolean;
   private refreshTimer?: () => boolean;
   private playerLease:NativePlayerLease|undefined;
   private initialization:ReturnType<typeof setTimeout>|undefined;
@@ -323,6 +324,8 @@ export class UnithostComponent implements OnInit, OnDestroy {
     const entry = navigation?.extras.info as UnitEntryNavigation | undefined;
     const isTarget = entry?.unitSequenceId === unitSequenceId;
     this.gotoCommandId = isTarget ? entry.commandId : undefined;
+    const ownsGoto = isTarget ? entry.ownsGoto : undefined;
+    this.ownsGoto = ownsGoto;
     this.refreshTimer = isTarget ? entry.refreshTimer : undefined;
     this.tcs.currentUnitSequenceId = unitSequenceId;
 
@@ -350,6 +353,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
       .subscribe({
         error: err => {
           settledSynchronously = true;
+          if (ownsGoto?.() === false) return;
           this.mds.appError = new AppError({
             label: `Unit konnte nicht geladen werden. ${err.info}`,
             description: (err.info) ? err.info : err,
@@ -359,7 +363,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
         },
         complete: () => {
           settledSynchronously = true;
-          this.prepareUnit();
+          if (ownsGoto?.() !== false) this.prepareUnit();
         }
       });
     if (!settledSynchronously) {
@@ -383,12 +387,20 @@ export class UnithostComponent implements OnInit, OnDestroy {
   }
 
   private async runUnit(): Promise<void> {
-    if (this.tcs.currentUnit && this.tcs.currentUnit.parent.locked) {
+    const unit = this.tcs.currentUnit;
+    const entry = this.unitEntry;
+    const ownsGoto = this.ownsGoto;
+    const refreshTimer = this.refreshTimer;
+    const ownsEntry = () => !this.destroyed && this.unitEntry === entry && this.mds.http.isCurrent &&
+      this.tcs.currentUnit === unit && ownsGoto?.() !== false && refreshTimer?.() !== false;
+    if (!unit || !ownsEntry()) return;
+
+    if (unit.parent.locked) {
       if (this.tcs.testMode.showCode) {
         this.messageService.showSnackbar(
           [
             'Das Freigabewort lautet ',
-            { emphasized: this.tcs.currentUnit.parent.locked?.through.restrictions.codeToEnter?.code ?? '' }
+            { emphasized: unit.parent.locked.through.restrictions.codeToEnter?.code ?? '' }
           ],
           'Schließen',
           0
@@ -397,13 +409,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const unit=this.tcs.currentUnit;
-    const timerId=unit?.parent.timerId;
-    const entry=this.unitEntry;
-    const refreshTimer = this.refreshTimer;
-    const ownsEntry = () => !this.destroyed && this.unitEntry === entry && this.mds.http.isCurrent &&
-      this.tcs.currentUnit === unit && (!refreshTimer || refreshTimer());
-    if (!unit || !ownsEntry()) return;
+    const timerId = unit.parent.timerId;
     try{
       if(timerId&&(timerId!==this.tcs.currentTimerId||refreshTimer)&&
         !await this.tcs.startTimer(this.tcs.testlets[timerId],unit,this.changedUnit,ownsEntry,this.gotoCommandId))return;
@@ -416,6 +422,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
     if(!ownsEntry())return;
     const playerHtml = await prepareNativePlayerHtml(this.tcs.getPlayer(unit.playerFileName));
     if(!ownsEntry())return;
+    this.ownsGoto = undefined;
     this.refreshTimer = undefined;
     this.prepareIframe(playerHtml);
     this.tcs.updateNavigationState();

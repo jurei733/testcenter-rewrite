@@ -291,6 +291,7 @@ export type NavigationDirections = Readonly<Record<NavigationDirection, Navigati
 export interface UnitEntryNavigation {
   unitSequenceId: number;
   commandId?: string;
+  ownsGoto?: () => boolean;
   refreshTimer?: () => boolean;
 }
 
