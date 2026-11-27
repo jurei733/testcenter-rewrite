@@ -127,6 +127,36 @@ for (const kind of kinds) test(`${kind}: Original archive distinguishes omitted 
       }
       assert.deepEqual((await report([' beta ', 'beta'])).manifest.groupKeys, ['beta']);
     });
+    await t.test('delivery checks the rendered workspace and withholds the archive if access no longer holds', async () => {
+      const steps = [];
+      const { workspaceAdminRead: results } = createFirstSliceServices({
+        repository,
+        now() {
+          steps.push('archive timestamp');
+          return timestamp;
+        }
+      });
+      const denied = new Error('The current workspace grant is absent.');
+      for (const allowed of [true, false]) {
+        steps.length = 0;
+        const exportResult = results.exportOriginalResultArchive({
+          ...scope,
+          groupKeys: ['alpha'],
+          async verifyCurrentAccess(target) {
+            assert.deepEqual(steps, ['archive timestamp']);
+            assert.deepEqual(target, { tenantId: workspace.tenantId, workspaceId: workspace.workspaceId });
+            steps.push('verify current access');
+            if (!allowed) throw denied;
+          }
+        });
+        if (allowed) {
+          assert.deepEqual(readArchive(await exportResult).manifest.groupKeys, ['alpha']);
+        } else {
+          await assert.rejects(exportResult, error => error === denied);
+        }
+        assert.deepEqual(steps, ['archive timestamp', 'verify current access']);
+      }
+    });
     await t.test('unfiltered selection is workspace-scoped and survives durable reopen', async () => {
       const before = await report();
       if (kind !== 'memory') { await storage.shutdown(); await open(); }

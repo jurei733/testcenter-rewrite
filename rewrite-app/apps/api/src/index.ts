@@ -33,11 +33,11 @@ import { createRequestLifecycle } from "./request-lifecycle.js";
 
 import {
   createFirstSliceServices,
+  FirstSliceError,
   prepareOriginalXmlSchemaValidator,
   originalXmlSchemaPolicy,
   originalXmlSchemaVersions,
   type XmlSchemaProfile,
-  type FirstSliceError,
   type FirstSliceRepository,
   type FirstSliceServices,
   firstSliceUseCases,
@@ -2820,7 +2820,8 @@ const resolveOperatorAccessScope = (
 const resolveOperatorAdminAccess = async (
   repository: FirstSliceRepository,
   roleAssignments: AdminRoleAssignment[],
-  scope: OperatorAccessScope
+  scope: OperatorAccessScope,
+  resolvedWorkspace?: { tenantId: string; workspaceId: string }
 ): Promise<AdminRoleAssignment["accessMode"] | null> => {
   if (roleAssignments.some(roleAssignment => roleAssignment.role === "platform_admin")) {
     return "read_write";
@@ -2830,7 +2831,8 @@ const resolveOperatorAdminAccess = async (
     return null;
   }
 
-  const tenant = await repository.getTenantByKey(scope.tenantKey);
+  const tenant =
+    resolvedWorkspace ?? await repository.getTenantByKey(scope.tenantKey);
   if (!tenant) {
     return null;
   }
@@ -2849,10 +2851,9 @@ const resolveOperatorAdminAccess = async (
     return null;
   }
 
-  const workspace = await repository.getWorkspaceByScope(
-    scope.tenantKey,
-    scope.workspaceKey
-  );
+  const workspace =
+    resolvedWorkspace ??
+    await repository.getWorkspaceByScope(scope.tenantKey, scope.workspaceKey);
   if (!workspace) {
     return null;
   }
@@ -8234,7 +8235,36 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await services.workspaceAdminRead.exportOriginalResultArchive({
             tenantKey,
             workspaceKey,
-            groupKeys: url.searchParams.has("groupKey") ? groupKeys : undefined
+            groupKeys: url.searchParams.has("groupKey") ? groupKeys : undefined,
+            verifyCurrentAccess: runtime.config.operatorAuthRequired
+              ? async target => {
+                  const sessionToken = readBearerToken(request);
+                  if (!sessionToken) {
+                    throw new FirstSliceError(
+                      401, "admin_session_missing", "Admin bearer session is required."
+                    );
+                  }
+                  const workspace =
+                    await runtime.repository.getWorkspaceByScope(tenantKey, workspaceKey);
+                  const { roleAssignments } =
+                    await services.adminAuth.getCurrentSession({ sessionToken });
+                  const scope = { kind: "workspace", tenantKey, workspaceKey } as const;
+                  if (
+                    !workspace ||
+                    workspace.tenantId !== target.tenantId ||
+                    workspace.workspaceId !== target.workspaceId ||
+                    !await resolveOperatorAdminAccess(runtime.repository, roleAssignments, scope, workspace)
+                  ) {
+                    throw new FirstSliceError(
+                      403, "admin_role_required",
+                      "The admin session does not have the required role.", {
+                        requiredRoles: ["platform_admin", "tenant_admin", "workspace_admin"],
+                        scope: describeOperatorAccessScope(scope)
+                      }
+                    );
+                  }
+                }
+              : undefined
           });
         sendAsset(response, 200, archive.mediaType, archive.body, {
           "cache-control": "private, no-store",

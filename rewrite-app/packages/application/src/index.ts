@@ -760,6 +760,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     /** Omitted selects every workspace group; an explicit empty selection selects none. */
     groupKeys?: string[];
+    verifyCurrentAccess?: (target: Pick<Workspace, "tenantId" | "workspaceId">) => Promise<void>;
   }): Promise<WorkspaceOriginalResultArchive>;
   getContentReleaseActivationReadiness(input: {
     tenantKey: string;
@@ -31875,7 +31876,7 @@ export const createFirstSliceServices = (
         // Native rows are authoritative from one workspace snapshot. A concurrent
         // mirror write must never be exported as a second, legacy Review.
         const nativePersonIds = new Set(nativePeople.map(person => person.participantSessionId));
-        return createOriginalResultArchive({
+        const archive = createOriginalResultArchive({
           nativeReviewReport,
           nativeLogs: nativeLogs?.rows ?? [],
           nativePersonIds,
@@ -31892,6 +31893,12 @@ export const createFirstSliceServices = (
           contentReleases,
           activityEvents
         });
+        if (input.verifyCurrentAccess) {
+          await input.verifyCurrentAccess({
+            tenantId: workspace.tenantId, workspaceId: workspace.workspaceId
+          });
+        }
+        return archive;
       },
       async getContentReleaseActivationReadiness(input) {
         const workspace = await requireWorkspace(
