@@ -154,6 +154,25 @@ try{
  }finally{failProfile();await page.unroute('**/monitor/profile/small',failedProfile);}
  const beforeSmall=wire.length;await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/small?ui=original',{waitUntil:'domcontentloaded'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);assert.ok(wire.slice(beforeSmall).some(r=>r.path==='/monitor/profile/small'));await page.goto(base+'/app/group-monitor/'+encodeURIComponent(group)+'/full?ui=original',{waitUntil:'domcontentloaded'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);check('both-claimed-profiles-open-through-restored-direct-routes');
  await page.evaluate(()=>document.fonts.ready);await page.screenshot({path:join(artifacts,'native-monitor-desktop.png'),fullPage:false});await page.reload({waitUntil:'domcontentloaded'});await page.locator('tc-test-session').first().waitFor();assert.equal(await page.locator('tc-test-session').count(),2);check('native-bearer-restores-on-reload');
+ const monitorToolbar=page.locator('[data-cy=header]');
+ const fullHeading=await monitorToolbar.locator('h1').innerText();
+ assert.ok(fullHeading.includes('Owned Monitor Group'));
+ const desktopViewport=page.viewportSize();
+ await page.setViewportSize({width:390,height:desktopViewport.height});
+ const namedHeading=monitorToolbar.getByRole('heading',{name:fullHeading,exact:true});
+ await monitorToolbar.locator('.center h1[aria-label]').waitFor();
+ assert.equal(await namedHeading.innerText(),'Owned Monitor Group');
+ assert.ok(await namedHeading.evaluate(node=>{
+  const logo=node.closest('mat-toolbar').querySelector('[data-cy=logo]');
+  const image=logo.getBoundingClientRect(),range=document.createRange();
+  range.selectNodeContents(node);
+  const hit=document.elementFromPoint((image.left+image.right)/2,(image.top+image.bottom)/2);
+  return [...range.getClientRects()].every(line=>line.left>=0&&line.right<=image.left)&&logo.closest('a').contains(hit);
+ }));
+ await page.setViewportSize(desktopViewport);
+ await monitorToolbar.locator('.center h1:not([aria-label])').waitFor();
+ assert.equal(await namedHeading.innerText(),fullHeading);
+ check('native-monitor-long-heading-wraps-without-covering-logo-and-restores-on-resize');
  // Exercise the real time confirmation and native Goto producer.
  await page.evaluate(()=>{window.__ownedTimerEvents=[];for(const type of ['input','change','focus','blur','click'])document.addEventListener(type,event=>{const element=event.target;if(element?.id!=='setTimer'&&!element?.closest?.('time-restriction-dialog'))return;const input=document.querySelector('#setTimer');window.__ownedTimerEvents.push({type,trusted:event.isTrusted,target:element.tagName,value:input?.value,classes:input?.className,at:performance.now()});if(window.__ownedTimerEvents.length>200)window.__ownedTimerEvents.shift();},true);});
  for(const [index,id] of [firstId,secondId].entries()){

@@ -40,13 +40,18 @@ const storeRoot=await mkdtemp(join(tmpdir(),'owned-native-monitor-visual-'));
 try{
 const file=join(storeRoot,'store.sqlite'),storage=createSqliteFirstSliceStorage(file),validator=await prepareOriginalXmlSchemaValidator(process.env.FIRST_SLICE_XML_SCHEMA_CACHE??join(app,'.data/original-xml-schemas'),false),services=createFirstSliceServices({repository:storage.repository,originalXmlSchemaValidator:validator,xmlSchemaProfile:'original-19'});
 const group='OWNED.PARITY',name='owned-parity-monitor';
+// Keep the entire reference viewport valid at 390px, including its centered heading.
+const visualAdmin={username:'owned-parity-admin',password:'Owned parity fixture password'};
+await services.adminAuth.bootstrapAdminUser(visualAdmin);
+const {adminSession}=await services.adminAuth.signIn(visualAdmin);
+await services.applicationSettings.patchOriginalApplicationSettings({sessionToken:adminSession.token,appTitle:'TC'});
 const xml=(type,body)=>`<${type} xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://w3id.org/iqb/spec/${type==='Unit'?'unit-xml/17.6':type==='Booklet'?'testcenter-booklet-xml/18.0':'testcenter-testtaker-xml/18.0'}">${body}</${type}>`;
 const t=await services.platform.createTenant({tenantKey:'owned-parity',displayName:'Owned parity'}),w=await services.platform.createWorkspace({tenantKey:t.tenantKey,workspaceKey:'owned',displayName:'Owned parity'}),scope={tenantKey:t.tenantKey,workspaceKey:w.workspaceKey};
 const upload=(fileName,sourceDocument,mediaType='application/xml')=>services.contentIntake.uploadWorkspaceFile({...scope,fileName,sourceDocument,mediaType});
 await upload('player.html','<html><script type="application/ld+json">'+JSON.stringify({id:'owned-player',version:'1.2.3',specVersion:'6.0',metadataVersion:'2.0',type:'player',name:[{lang:'de',value:'Owned Player'}]})+'</script><main>Owned</main></html>','text/html');
 await upload('unit.xml',xml('Unit','<Metadata><Id>OWNED.UNIT</Id><Label>Owned Unit</Label></Metadata><Definition player="owned-player@1.2.3">Owned</Definition>'));
 await upload('booklet.xml',xml('Booklet','<Metadata><Id>OWNED.BOOK</Id><Label>Owned Monitor Booklet</Label></Metadata><Units><Testlet id="B1" label="Owned Block"><Restrictions><TimeMax minutes="10"/></Restrictions><Unit id="OWNED.UNIT" label="Owned Unit"/></Testlet></Units>'));
-await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><Group id="'+group+'" label="Owned Monitor Group"><Login name="'+name+'" mode="monitor-group"/><Login name="owned-alpha" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login><Login name="owned-beta" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login></Group>')});
+await services.workspaceAdminRead.importParticipantRoster({...scope,rosterText:xml('Testtakers','<Metadata/><CustomTexts><CustomText key="gm_headline">GM</CustomText></CustomTexts><Group id="'+group+'" label="Lesen"><Login name="'+name+'" mode="monitor-group"/><Login name="owned-alpha" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login><Login name="owned-beta" mode="run-hot-return"><Booklet>OWNED.BOOK</Booklet></Login></Group>')});
 for(const person of ['owned-alpha','owned-beta']){const a=await services.originalSession.login({name:person,password:''}),id=await services.originalTest.create({token:a.token,bookletName:'OWNED.BOOK'});await services.originalTest.read({token:a.token,testNumber:id});await services.originalTest.patchState({token:a.token,testNumber:id,patch:[{key:'CURRENT_UNIT_ID',content:'OWNED.UNIT',timeStamp:100},{key:'CONTROLLER',content:'RUNNING',timeStamp:101},{key:'CONNECTION',content:'POLLING',timeStamp:102},...(scene.startsWith('time-dialog')?[{key:'TESTLETS_TIMELEFT',content:JSON.stringify({B1:0}),timeStamp:104}]:[])]});await services.originalUnit.patchState({token:a.token,testNumber:id,unitName:'OWNED.UNIT',body:{newState:[{key:'PRESENTATION_PROGRESS',content:'some',timeStamp:103}]}});}
 await storage.shutdown();
 let server,browser,sourceServer;const pages=[],surfaces=[],errors=[],unknown=[],requests=[],captureFailures=[];let base;
@@ -83,6 +88,14 @@ try{
    surfaces.push({side,screen,origin:new URL(page.url()).origin,path:new URL(page.url()).pathname,documentSha256:createHash('sha256').update(documentBytes).digest('hex')});
    if(side==='source'||selfControl)await page.getByRole('button',{name:'Gruppen-Monitor Starten',exact:true}).click();
    await page.waitForFunction(()=>document.querySelectorAll('tc-test-session').length===2);await page.getByText('Owned Monitor Booklet',{exact:true}).first().waitFor();await page.evaluate(()=>document.fonts.ready);await page.mouse.move(1,1);
+   const heading=page.locator('[data-cy=header] h1');
+   await page.getByRole('heading',{name:'TC GM - Lesen',exact:true}).waitFor();
+   assert.equal(await heading.innerText(),'TC GM - Lesen');
+   assert.ok(await heading.evaluate(node=>{
+    const headingBox=node.getBoundingClientRect();
+    const logo=node.closest('mat-toolbar').querySelector('[data-cy=logo]').getBoundingClientRect();
+    return headingBox.left>=0&&headingBox.right<=logo.left;
+   }));
    const sceneEvidence=await prepareMonitorVisualScene(page,scene,screen);await writeFile(join(out,screen+'-'+side+'-scene.json'),JSON.stringify(sceneEvidence,null,2));await page.mouse.move(1,1);
    await page.waitForFunction(()=>document.getAnimations().every(a=>!Number.isFinite(a.effect?.getTiming().iterations)||a.playState==='finished'),{},{timeout:2000});
    const inspectLayout=()=>page.evaluate(()=>{
