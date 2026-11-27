@@ -960,13 +960,18 @@ test("native public system config projects bootstrap settings and safe notice HT
         body: {
           appTitle: "Owned display", themeName: "Sekundar", legalNoticeHtml: unsafeNotice,
           privacyNotice: "<p>Privacy</p>", accessibilityNotice: "<p>Access</p>",
-          customTexts: { login_subtitle: "Owned public text" },
+          customTexts: {
+            login_subtitle: "Owned public text", constructor: "Owned compatibility control",
+            toString: "Owned inherited name"
+          },
           globalWarningText: "Owned maintenance", globalWarningExpiresAt: "2050-06-12T17:00:00Z"
         }
       }
     );
     assert.equal(update.status, 200);
     assert.equal(update.body.applicationSettings.legalNoticeHtml, unsafeNotice);
+    assert.equal(Object.getOwnPropertyDescriptor(update.body.applicationSettings.customTexts, "constructor")?.value,
+      "Owned compatibility control");
     const current = await get("/system/config");
     assert.deepEqual(current.body.customTexts, { login_subtitle: "Owned public text" });
     assert.deepEqual(current.body.appConfig, {

@@ -91,7 +91,9 @@ export function projectOriginalSystemConfig(input: {
     ? ` ${input.commitSha.slice(0, 12)}` : "";
   return {
     version: `Rewrite${revision}`,
-    customTexts: settings.customTexts,
+    // The Original client stores its text subjects in a plain object.
+    customTexts: Object.fromEntries(Object.entries(settings.customTexts)
+      .filter(([key]) => !Object.hasOwn(Object.prototype, key))),
     appConfig: {
       appTitle: settings.appTitle,
       themeName: settings.themeName,
