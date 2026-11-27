@@ -53,7 +53,8 @@ header mat-toolbar.compact-heading {
 }
 .group-monitor-toolbar .logo { justify-self: end; height: auto; }
 .group-monitor-toolbar .logo a { display: block; height: calc(var(--monitor-toolbar-height) - 16px); }
-.group-monitor-toolbar .logo img { display: block; max-width: 30vw; object-fit: contain; }
+.group-monitor-toolbar .logo img { display: block; }
+.compact-heading .logo img { max-width: 30vw; object-fit: contain; }
 @media (max-width: 599px) {
   header mat-toolbar.group-monitor-toolbar { --monitor-toolbar-height: var(--mat-toolbar-mobile-height, 56px); }
 }

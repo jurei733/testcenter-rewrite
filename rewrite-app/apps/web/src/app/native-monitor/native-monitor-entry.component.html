@@ -13,7 +13,7 @@
    <h1 [attr.aria-label]="compact ? group.title : null">{{compact ? group.groupLabel : headerTitle}}</h1>
   </div>
   @if(group){<div class="heading-measurement" aria-hidden="true"><span #headingProbe>{{group.title}}</span></div>}
-  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img #headingLogo [src]="settings.assetUrl('logo',settings.settings().mainLogo)" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" /></a></div>
+  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img #headingLogo [src]="settings.assetUrl('logo',settings.settings().mainLogo)" (load)="updateHeadingFit()" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" /></a></div>
  </mat-toolbar>
 </header>
 @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}

@@ -76,15 +76,11 @@ export class NativeMonitorEntryComponent implements OnDestroy {
    const probe=this.headingProbe()?.nativeElement,logo=this.headingLogo()?.nativeElement;
    const bounds=probe?.parentElement;
    if(!probe||!logo||!bounds)return;
-   const check=()=>{
-    const title=probe.getBoundingClientRect();
-    this.fullHeadingFits.set(title.left>=bounds.getBoundingClientRect().left&&title.right<=logo.getBoundingClientRect().left);
-   };
-   const observer=new ResizeObserver(check);
+   const observer=new ResizeObserver(()=>this.updateHeadingFit());
    observer.observe(bounds);
    observer.observe(probe);
    observer.observe(logo);
-   check();
+   this.updateHeadingFit();
    onCleanup(()=>observer.disconnect());
   });
   this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>{
@@ -106,6 +102,16 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   this.releaseLoginTab=undefined;
   if(!this.hasChild)this.clearStarterHeader=this.publicHeader.setTitle('Übersicht');
   else{this.clearStarterHeader?.();this.clearStarterHeader=undefined;}
+ }
+ protected updateHeadingFit():void {
+  const probe=this.headingProbe()?.nativeElement,logo=this.headingLogo()?.nativeElement;
+  const bounds=probe?.parentElement;
+  if(!probe||!logo||!bounds)return;
+  const title=probe.getBoundingClientRect(),image=logo.getBoundingClientRect();
+  const naturalWidth=logo.naturalHeight?image.height*logo.naturalWidth/logo.naturalHeight:image.width;
+  // Measure the space the logo would use at full height, even when compact layout limits its width.
+  const fullLogoLeft=image.right-Math.max(image.width,naturalWidth);
+  this.fullHeadingFits.set(title.left>=bounds.getBoundingClientRect().left&&title.right<=fullLogoLeft);
  }
  get hasChild(){return !!this.route.firstChild;}
  get groupHeading(){return this.hasChild&&this.allowedChild?this.header.groupHeading:null;}
