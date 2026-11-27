@@ -1034,6 +1034,16 @@ owned by this deployment or its trusted ingress:
 npm run start:compose:postgres:production
 ```
 
+Set `FIRST_SLICE_PUBLIC_NATIVE_API_BASE_URL` when the public API address differs
+from the address seen by the API process. Include the externally routed path,
+for example `https://test.example.org/lab/api`. Both legacy `system/config`
+routes advertise this address as `baseUrl` without a trailing slash. Configure
+the corresponding route in the ingress. If the setting is empty, each route
+derives its address from the direct request. Forwarded headers do not set this
+metadata. Use a canonical hostname and unescaped mount path that the ingress
+serves. Runtime preflight and startup reject malformed hostnames, ambiguous
+mount paths, embedded credentials, queries and fragments.
+
 For the first clean deployment, inject the initial platform-administrator
 password from a secret-manager-owned file rather than an environment value,
 image default, command-line argument, or checked-in file:

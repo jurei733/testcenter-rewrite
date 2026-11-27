@@ -1,6 +1,7 @@
 import {handleOriginalAssetHttp,originalAssetRouteLabel} from './original-asset-http.js';
 import {handleOriginalSystemCheckHttp,originalSystemCheckRouteLabel} from './original-system-check-http.js';
 import { isOriginalSystemConfigPath, projectOriginalSystemConfig } from "./original-system-config.js";
+import { parsePublicNativeApiBaseUrl } from "./public-native-api-base-url.js";
 import {handleOriginalAdminHttp,originalAdminRouteLabel} from './original-admin-http.js';
 import {handleOriginalWorkspaceHttp,originalWorkspaceRouteLabel} from './original-workspace-http.js';
 import {formatOriginalTestAdministrationJson} from '@testcenter-rewrite-app/application';
@@ -672,6 +673,7 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_HSTS_ENABLED",
     false
   );
+  const publicNativeApiBaseUrl = parsePublicNativeApiBaseUrl(process.env.FIRST_SLICE_PUBLIC_NATIVE_API_BASE_URL);
   const adminLoginMaxFailures = parsePositiveIntegerEnvironmentValue(
     "FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES",
     DEFAULT_ADMIN_LOGIN_MAX_FAILURES
@@ -909,6 +911,7 @@ const createApiRuntime = async () => {
       transportSecurity: {
         hstsEnabled
       },
+      publicNativeApiBaseUrl,
       operatorAuthRequired,
       bootstrapAdmin: {
         configured: Boolean(bootstrapAdmin)
@@ -4804,6 +4807,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const settings = await services.applicationSettings.getApplicationSettings();
         sendJson(response, 200, projectOriginalSystemConfig({
           request, pathname, settings, commitSha: runtime.build.commitSha,
+          publicNativeApiBaseUrl: runtime.config.publicNativeApiBaseUrl,
           challengeScopes: runtime.config.proofOfWork.enabledScopes,
           passwordPolicy: runtime.config.adminPasswordPolicy,
           timeZone: runtime.config.participantAccessTimeZone

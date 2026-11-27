@@ -882,6 +882,7 @@ test("native public system config projects bootstrap settings and safe notice HT
     FIRST_SLICE_BOOTSTRAP_ADMIN_USERNAME: "",
     FIRST_SLICE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "",
     FIRST_SLICE_BOOTSTRAP_ADMIN_PASSWORD_FILE: "",
+    FIRST_SLICE_PUBLIC_NATIVE_API_BASE_URL: "",
     FIRST_SLICE_ADMIN_PASSWORD_MIN_LENGTH: "10",
     FIRST_SLICE_ADMIN_PASSWORD_PATTERN: ".*[0-9].*",
     FIRST_SLICE_PARTICIPANT_TIME_ZONE: "Europe/Berlin",
@@ -984,6 +985,50 @@ test("native public system config projects bootstrap settings and safe notice HT
     assert.doesNotMatch(JSON.stringify(current.body), /currentKeyId|proof-secret|updatedByAdminUserId|assetAssignments/);
   } finally {
     await closeServer(isolated.server);
+  }
+});
+
+test("native public system config advertises the configured HTTPS mount through both aliases", async () => {
+  const advertisedUrl = "https://testcenter.example.test/lab/api";
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false",
+    FIRST_SLICE_PUBLIC_NATIVE_API_BASE_URL: advertisedUrl + "/"
+  });
+  try {
+    for (const pathname of ["/system/config", "/api/system/config"]) {
+      const response = await requestJsonAt<{ baseUrl: string }>(isolated.baseUrl, pathname, {
+        headers: {
+          "forwarded": "host=another.example.test;proto=http",
+          "x-forwarded-host": "another.example.test",
+          "x-forwarded-proto": "http",
+          "x-forwarded-prefix": "/another"
+        }
+      });
+      assert.equal(response.status, 200);
+      assert.equal(response.body.baseUrl, advertisedUrl);
+    }
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("native public system config rejects invalid deployment URLs at startup", async () => {
+  for (const value of [
+    "/lab/api", "ftp://testcenter.example.test/lab",
+    "https://user:password@testcenter.example.test", "https://testcenter.example.test/api?mode=test",
+    "https://testcenter.example.test/api#anchor", "https://@testcenter.example.test/api",
+    "https:///testcenter.example.test/api", "https://127.1/lab/api",
+    "http://192.000.002.010:4310/lab/api", "https://testcenter%2eexample.test/lab/api",
+    "https://testcenter.example.test:/lab/api", " \t\n", " https://testcenter.example.test/lab/api\n",
+    "https://testcenter.example.test/lab/%2e%2e/api",
+    "https://testcenter.example.test/lab//api", "https://testcenter.example.test/lab%2fapi",
+    "https://testcenter.example.test/lab/%61pi", "https://testcenter..example.test/lab/api"
+  ]) {
+    await assert.rejects(
+      createIsolatedServer({ FIRST_SLICE_STORE: "memory", FIRST_SLICE_PUBLIC_NATIVE_API_BASE_URL: value }),
+      /FIRST_SLICE_PUBLIC_NATIVE_API_BASE_URL must be an absolute HTTP\(S\) URL/u
+    );
   }
 });
 

@@ -79,6 +79,7 @@ const nativeProtectionScope = {admin: "admin", participant: "login", second_code
 export function projectOriginalSystemConfig(input: {
   request: IncomingMessage;
   pathname: string;
+  publicNativeApiBaseUrl: string | undefined;
   settings: ApplicationSettings;
   commitSha: string | null;
   challengeScopes: readonly ProofOfWorkScope[];
@@ -104,7 +105,7 @@ export function projectOriginalSystemConfig(input: {
       globalWarningExpiredDay: warningExpiry.day,
       globalWarningExpiredHour: warningExpiry.hour
     },
-    baseUrl: requestBaseUrl(input.request, input.pathname),
+    baseUrl: input.publicNativeApiBaseUrl ?? requestBaseUrl(input.request, input.pathname),
     bruteForceProtection: input.challengeScopes.map(scope => nativeProtectionScope[scope]),
     veronaPlayerApiVersionMin: SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN,
     veronaPlayerApiVersionMax: SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,

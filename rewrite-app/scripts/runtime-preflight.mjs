@@ -430,6 +430,9 @@ for (const filePath of requiredBuiltFiles) {
   await ensureFile(filePath);
 }
 
+const { parsePublicNativeApiBaseUrl } = await import("../apps/api/dist/apps/api/src/public-native-api-base-url.js");
+parsePublicNativeApiBaseUrl(process.env.FIRST_SLICE_PUBLIC_NATIVE_API_BASE_URL);
+
 if (xmlSchemaProfile === "original-19") {
   const { prepareOriginalXmlSchemaValidator } = await import(
     "../packages/application/dist/packages/application/src/original-xml-schema.js"
