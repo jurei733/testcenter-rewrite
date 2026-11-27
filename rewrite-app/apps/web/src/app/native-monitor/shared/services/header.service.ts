@@ -14,7 +14,7 @@ type HeadingSettings = { appTitle: string; globalSubtitle: string } | null;
 export class HeaderService {
  private readonly session=inject(NativeMonitorSessionService);
  private readonly settings=inject(ApplicationSettingsService);
- private readonly heading=signal('');
+ private readonly heading=signal<{title:string; subtitle:string; groupLabel:string}|null>(null);
  private readonly routeSettings=new WeakMap<ActivatedRouteSnapshot,HeadingSettings>();
  private initialSettings:HeadingSettings|undefined;
  private release:(()=>void)|undefined;
@@ -40,16 +40,17 @@ export class HeaderService {
    if(this.release!==retire)return;
    scope.removeEventListener('abort',retire);
    this.release=undefined;
-   this.heading.set('');
+   this.heading.set(null);
    releaseTab();
   };
   this.release=retire;
   scope.addEventListener('abort',retire,{once:true});
-  this.heading.set(`${appTitle} ${subtitle} - ${groupLabel}`);
+  this.heading.set({title:`${appTitle} ${subtitle} - ${groupLabel}`,subtitle,groupLabel});
   return retire;
  }
 
- get title(){return this.heading();}
+ get title(){return this.heading()?.title??'';}
+ get groupHeading(){return this.heading();}
 
  private readSettings():HeadingSettings{
   if(!this.settings.loaded())return null;

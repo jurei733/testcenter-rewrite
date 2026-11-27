@@ -13,7 +13,7 @@ function load(relative){
  const source=readFileSync(new URL('../apps/web/src/app/'+relative,import.meta.url),'utf8');
  const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
  const exports={};new Function('exports','require',code)(exports,spec=>{
-  if(spec==='@angular/core')return {...core,Component:()=>value=>value,effect:callback=>callback(),inject:key=>{const name=names.get(key)??key.name;assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}};
+  if(spec==='@angular/core')return {...core,Component:()=>value=>value,effect:callback=>callback(),viewChild:()=>()=>undefined,inject:key=>{const name=names.get(key)??key.name;assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}};
   if(spec==='rxjs')return rx;
   if(spec==='@angular/common/http')return {HttpErrorResponse:BrowserHttpError,HttpHeaders:class{constructor(values){this.get=key=>values[key]??null;}}};
   if(spec==='@testcenter-rewrite-app/contracts')return {redactBugReportText};

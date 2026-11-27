@@ -4,7 +4,7 @@ import {filter,fromEvent,Subscription,take,takeUntil} from 'rxjs';
 import {BookletService} from './group-monitor/booklet/booklet.service';
 import {TestSessionManager} from './group-monitor/test-session-manager/test-session-manager.service';
 import {GROUP_MONITOR_CONFIG} from './group-monitor/group-monitor.config';
-import {ChangeDetectorRef,Component,effect,inject,signal,type OnDestroy} from '@angular/core';
+import {ChangeDetectorRef,Component,effect,inject,signal,viewChild,type ElementRef,type OnDestroy} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {Router,RouterOutlet,RouterLink,ActivatedRoute,NavigationEnd} from '@angular/router';
 import {MatButton,MatIconButton} from '@angular/material/button';
@@ -43,6 +43,9 @@ export class NativeMonitorEntryComponent implements OnDestroy {
  readonly session=inject(NativeMonitorSessionService);readonly settings=inject(ApplicationSettingsService);
  readonly assets=inject(NativeAssetContext);
  readonly header=inject(HeaderService);readonly backend=inject(BackendService);
+ private readonly headingProbe=viewChild<ElementRef<HTMLElement>>('headingProbe');
+ private readonly headingLogo=viewChild<ElementRef<HTMLImageElement>>('headingLogo');
+ readonly fullHeadingFits=signal(false);
  private readonly backendSubscription=new Subscription();
  private readonly view=new AbortController();
  private retireLogout:(()=>void)|undefined;
@@ -69,6 +72,21 @@ export class NativeMonitorEntryComponent implements OnDestroy {
    }else if(access)void this.loginFailure.show(error,view,undefined,{login:access.displayName,returnPath:'group-monitor'});
   }));
   effect(()=>{if(!this.session.restoring())this.updatePublicHeader();});
+  effect(onCleanup=>{
+   const probe=this.headingProbe()?.nativeElement,logo=this.headingLogo()?.nativeElement;
+   const bounds=probe?.parentElement;
+   if(!probe||!logo||!bounds)return;
+   const check=()=>{
+    const title=probe.getBoundingClientRect();
+    this.fullHeadingFits.set(title.left>=bounds.getBoundingClientRect().left&&title.right<=logo.getBoundingClientRect().left);
+   };
+   const observer=new ResizeObserver(check);
+   observer.observe(bounds);
+   observer.observe(probe);
+   observer.observe(logo);
+   check();
+   onCleanup(()=>observer.disconnect());
+  });
   this.router.events.pipe(filter(event=>event instanceof NavigationEnd),takeUntil(fromEvent(this.view.signal,'abort'))).subscribe(()=>{
    this.updatePublicHeader();
    detector.markForCheck();
@@ -90,6 +108,7 @@ export class NativeMonitorEntryComponent implements OnDestroy {
   else{this.clearStarterHeader?.();this.clearStarterHeader=undefined;}
  }
  get hasChild(){return !!this.route.firstChild;}
+ get groupHeading(){return this.hasChild&&this.allowedChild?this.header.groupHeading:null;}
  get headerTitle(){if(!this.session.access())return 'Anmelden';return this.hasChild&&this.allowedChild?this.header.title||this.settings.settings().appTitle:this.session.access()&&!this.hasChild?'Übersicht':this.settings.settings().appTitle;}
  get showAccountPanel(){return !!this.session.access()&&!(this.hasChild&&this.allowedChild);}
  get starterOwners(){this.session.access();return [this.session.accessSignal];}

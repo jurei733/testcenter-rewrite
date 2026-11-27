@@ -7,6 +7,56 @@ header mat-toolbar { display:flex; flex-direction:row; justify-content:space-bet
 .center { position:absolute; left:50%; transform:translateX(-50%); }
 .center h1 { font-size:22px; line-height:28px; font-weight:400; margin:0; }
 .logo a,.logo img { height:100%; }
+header mat-toolbar.group-monitor-toolbar {
+  --monitor-toolbar-height: var(--mat-toolbar-standard-height, 64px);
+  position: relative;
+}
+.group-monitor-toolbar .heading-measurement {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+.heading-measurement span {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  white-space: nowrap;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 400;
+}
+header mat-toolbar.compact-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  height: auto;
+  min-height: var(--monitor-toolbar-height);
+}
+.compact-heading > .side:first-child { display: none; }
+.compact-heading .center {
+  position: static;
+  transform: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.compact-heading h1 { font-size: 20px; line-height: 24px; }
+.heading-context {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 20px;
+}
+.group-monitor-toolbar .logo { justify-self: end; height: auto; }
+.group-monitor-toolbar .logo a { display: block; height: calc(var(--monitor-toolbar-height) - 16px); }
+.group-monitor-toolbar .logo img { display: block; max-width: 30vw; object-fit: contain; }
+@media (max-width: 599px) {
+  header mat-toolbar.group-monitor-toolbar { --monitor-toolbar-height: var(--mat-toolbar-mobile-height, 56px); }
+}
 /* Revert the generic Rewrite reset where Original uses the browser defaults. */
 :host ::ng-deep button[mat-icon-button] { font-family:revert; font-weight:revert; }
 :host ::ng-deep .mat-mdc-slide-toggle .mdc-label { display:revert; gap:normal; font:inherit; color:inherit; }

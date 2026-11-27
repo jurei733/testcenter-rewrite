@@ -1,13 +1,19 @@
 <app-original-overlay-styles />
 <header>
- <mat-toolbar data-cy="header">
+ @let group = groupHeading;
+ @let compact = group && !fullHeadingFits();
+ <mat-toolbar data-cy="header" [class.group-monitor-toolbar]="group" [class.compact-heading]="compact">
   <div class="side">
    @if(showAccountPanel){
     @if(session.access();as access){<app-native-account-menu [access]="access" (logout)="logout()" />}
    }
   </div>
-  <div class="center"><h1>{{headerTitle}}</h1></div>
-  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img [src]="settings.assetUrl('logo',settings.settings().mainLogo)" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" /></a></div>
+  <div class="center">
+   @if(compact && group.subtitle){<span class="heading-context" aria-hidden="true">{{group.subtitle}}</span>}
+   <h1 [attr.aria-label]="compact ? group.title : null">{{compact ? group.groupLabel : headerTitle}}</h1>
+  </div>
+  @if(group){<div class="heading-measurement" aria-hidden="true"><span #headingProbe>{{group.title}}</span></div>}
+  <div class="side logo"><a routerLink="/group-monitor" aria-label="Gehe zur Startseite"><img #headingLogo [src]="settings.assetUrl('logo',settings.settings().mainLogo)" data-cy="logo" alt="Logo der Anwendung" matTooltip="Zur Startseite" matTooltipClass="original-application-logo-tooltip" /></a></div>
  </mat-toolbar>
 </header>
 @if(problem()){<p class="native-error" role="alert">{{problem()}}</p>}

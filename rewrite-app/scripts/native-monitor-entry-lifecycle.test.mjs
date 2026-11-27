@@ -10,7 +10,7 @@ const imports=new Proxy({}, {get:(_,name)=>{if(!tokens.has(name)){const value=cl
 function load(relative,current=false){
  const source=process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV&&!current?execFileSync('git',['show',process.env.NATIVE_MONITOR_ENTRY_SOURCE_REV+':rewrite-app/apps/web/src/app/native-monitor/'+relative],{encoding:'utf8'}):readFileSync(new URL('../apps/web/src/app/native-monitor/'+relative,import.meta.url),'utf8');
  const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
- const exports={};new Function('exports','require',code)(exports,spec=>spec==='@angular/core'?{...core,Component:()=>value=>value,Injectable:()=>value=>value,effect:callback=>callback(),inject:key=>{const name=names.get(key)??key.name;assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}}:spec==='rxjs'?rx:spec==='@testcenter-rewrite-app/domain'?{defaultApplicationSettings:{appTitle:'IQB-Testcenter'}}:spec.endsWith('/native-monitor-default-texts')?{nativeMonitorDefaultTexts:{gm_headline:'Gruppenüberwachung'}}:imports);return exports;
+ const exports={};new Function('exports','require',code)(exports,spec=>spec==='@angular/core'?{...core,Component:()=>value=>value,Injectable:()=>value=>value,effect:callback=>callback(),viewChild:()=>()=>undefined,inject:key=>{const name=names.get(key)??key.name;assert.ok(bindings.has(name),'Missing dependency '+name);return bindings.get(name);}}:spec==='rxjs'?rx:spec==='@testcenter-rewrite-app/domain'?{defaultApplicationSettings:{appTitle:'IQB-Testcenter'}}:spec.endsWith('/native-monitor-default-texts')?{nativeMonitorDefaultTexts:{gm_headline:'Gruppenüberwachung'}}:imports);return exports;
 }
 const {NativeMonitorEntryComponent}=load('native-monitor-entry.component.ts');
 const {HeaderService}=load('shared/services/header.service.ts');
@@ -87,8 +87,9 @@ test('replacement-login cancellation is silent even while the same entry view re
 function monitorRoute(f,group='owned'){f.route.firstChild={snapshot:{paramMap:new Map([['group-name',group]])}};}
 test('retired access clears the private header even on the retained group route',()=>{
  const f=fixture();monitorRoute(f);f.header.showGroup({},'Private group A');assert.equal(f.header.title,'Owned Gruppenüberwachung - Private group A');
+ assert.equal(f.component.groupHeading?.groupLabel,'Private group A');
  // Pinned Source LoginComponent restores the public 'Anmelden' heading.
- f.replace(null);assert.equal(f.header.title,'');assert.equal(f.component.headerTitle,'Anmelden');f.component.ngOnDestroy();
+ f.replace(null);assert.equal(f.header.title,'');assert.equal(f.component.groupHeading,null);assert.equal(f.component.headerTitle,'Anmelden');f.component.ngOnDestroy();
 });
 for(const sameToken of [false,true])test('a replacement access cannot display the previous header with '+(sameToken?'the same':'another')+' token',()=>{
  const f=fixture();monitorRoute(f);f.header.showGroup({},'Private group A');f.replace(access(sameToken?'original':'replacement'));
