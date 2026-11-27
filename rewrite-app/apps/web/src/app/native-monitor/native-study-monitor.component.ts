@@ -1,5 +1,5 @@
 import {DatePipe, DecimalPipe} from '@angular/common';
-import {Component, computed, effect, inject, signal, untracked, viewChild} from '@angular/core';
+import {afterNextRender, Component, computed, DOCUMENT, effect, ElementRef, inject, Injector, signal, untracked, viewChild} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, RouterLink} from '@angular/router';
 import {MatSort, MatSortHeader} from '@angular/material/sort';
@@ -67,13 +67,20 @@ import {NativeMonitorHttpError, NativeMonitorSessionService} from './native-sess
             </p>
             <button mat-stroked-button type="button" [disabled]="refreshing()" (click)="retry()">Erneut laden</button>
           </div>
-        } @else if (status() === 'signed-out') {
-          <p role="alert">Melden Sie sich an, um die Studienergebnisse zu sehen.</p>
-          <a mat-button routerLink="/native-start/login">Zur Anmeldung</a>
+        } @else if (status() === 'signed-out' || status() === 'expired') {
+          <p id="study-sign-in-message" role="alert">
+            @if (status() === 'expired') {
+              Ihre Anmeldung ist abgelaufen oder nicht mehr gültig. Melden Sie sich erneut an, um die Studienergebnisse zu sehen.
+            } @else {
+              Melden Sie sich an, um die Studienergebnisse zu sehen.
+            }
+          </p>
+          <a #signInLink mat-button routerLink="/native-start/login"
+             [attr.aria-describedby]="status() === 'expired' ? 'study-sign-in-message' : null">Zur Anmeldung</a>
         } @else if (status() === 'denied') {
           <p role="alert">Dieser Arbeitsbereich ist für Sie nicht freigegeben.</p>
         }
-        <div class="study-table" role="region" aria-label="Studienergebnisse" tabindex="0" [attr.aria-busy]="refreshing()">
+        <div #studyTable class="study-table" role="region" aria-label="Studienergebnisse" tabindex="0" [attr.aria-busy]="refreshing()">
           <mat-table [dataSource]="data" [trackBy]="trackGroup" matSort aria-label="Studienmonitor">
             @for (column of columns; track column.key) {
               <ng-container [matColumnDef]="column.key" [sticky]="column.key === 'groupName'">
@@ -111,7 +118,7 @@ export class NativeStudyMonitorComponent {
   readonly columnKeys = this.columns.map(column => column.key);
   readonly data = new MatTableDataSource<OriginalGroupResult>();
   readonly trackGroup = (_index: number, row: OriginalGroupResult) => row.groupName;
-  readonly status = signal<'loading'|'empty'|'current'|'retry'|'denied'|'signed-out'>('loading');
+  readonly status = signal<'loading'|'empty'|'current'|'retry'|'denied'|'signed-out'|'expired'>('loading');
   readonly resultStatus = computed(() => {
     switch (this.status()) {
       case 'loading': return 'Studienergebnisse werden geladen.';
@@ -121,7 +128,12 @@ export class NativeStudyMonitorComponent {
   });
   readonly refreshing = signal(false);
   private retryCurrent?: () => void;
+  private expiredWorkspace?: string;
   private readonly sort = viewChild(MatSort);
+  private readonly studyTable = viewChild<ElementRef<HTMLElement>>('studyTable');
+  private readonly signInLink = viewChild<unknown, ElementRef<HTMLAnchorElement>>('signInLink', {read: ElementRef});
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
   private readonly route = inject(ActivatedRoute);
   private readonly params = toSignal(this.route.paramMap, {initialValue: this.route.snapshot.paramMap});
   private readonly session = inject(NativeMonitorSessionService);
@@ -143,11 +155,12 @@ export class NativeStudyMonitorComponent {
     effect(onCleanup => {
       const workspace = this.params().get('workspace');
       const access = this.session.access();
+      if (access || workspace !== this.expiredWorkspace) this.expiredWorkspace = undefined;
       this.data.data = [];
       this.status.set('loading');
       this.refreshing.set(false);
       if (!workspace || !access?.claims.studyMonitor?.some(claim => claim.id === workspace) || access.flags.includes('codeRequired')) {
-        this.status.set(access ? 'denied' : 'signed-out');
+        this.status.set(access ? 'denied' : this.expiredWorkspace ? 'expired' : 'signed-out');
         return;
       }
       const view = new AbortController();
@@ -174,7 +187,7 @@ export class NativeStudyMonitorComponent {
           if (scope.aborted) return;
           if (error instanceof NativeMonitorHttpError) {
             if (error.status === 410) {
-              this.session.clear();
+              this.expireSession(workspace);
               return;
             }
             if (error.status === 404) this.data.data = [];
@@ -193,6 +206,20 @@ export class NativeStudyMonitorComponent {
   }
 
   retry(): void { this.retryCurrent?.(); }
+
+  private expireSession(workspace: string): void {
+    this.expiredWorkspace = workspace;
+    const focused = this.document.activeElement;
+    const tableWasFocused = this.studyTable()?.nativeElement.contains(focused);
+    this.session.clear();
+    if (tableWasFocused) {
+      afterNextRender({write: () => {
+        if (this.expiredWorkspace === workspace && this.status() === 'expired' && this.document.activeElement === focused) {
+          this.signInLink()?.nativeElement.focus();
+        }
+      }}, {injector: this.injector});
+    }
+  }
 
   ngOnDestroy(): void { this.owner.abort(); }
 }
