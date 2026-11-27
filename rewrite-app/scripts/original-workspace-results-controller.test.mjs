@@ -8,11 +8,16 @@ function load(name,bindings={}){
  new Function('exports',...Object.keys(bindings),ts.transpileModule(text,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports,...Object.values(bindings));return exports;
 }
 const {originalAdministrationId}=load('original-administration-wire.ts');
-const {OriginalWorkspaceResultsController:Controller}=load('original-workspace-results-controller.ts',{originalAdministrationId});
+const {readOriginalGroupResultRows}=load('original-group-result-rows.ts');
+const {OriginalWorkspaceResultsController:Controller}=load('original-workspace-results-controller.ts',{originalAdministrationId,readOriginalGroupResultRows});
 const {createOriginalWorkspaceResultsTransport}=load('original-workspace-results-http.ts');
 const source=JSON.parse(readFileSync(new URL('../test-fixtures/original-testcenter/source-workspace-results/native-test-administration-http/observations.json',import.meta.url)));
 const sessions=source.rows.find(row=>row.label==='exact-group-and-numeric-test-order').value;
 const row=(name='A')=>({groupName:name,groupLabel:'Gruppe '+name,bookletsStarted:3,numUnitsMin:0,numUnitsMax:2,numUnitsTotal:3,numUnitsAvg:1,lastChange:1793520000});
+test('group result snapshots reject an unrenderable date',()=>{
+ const valid=row();assert.deepEqual(readOriginalGroupResultRows([valid]),[valid]);
+ assert.throws(()=>readOriginalGroupResultRows([{...valid,lastChange:1e20}]),/Ungültige Ergebnisgruppe/);
+});
 const held=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 function fixture(handler,view='results',role='RW'){
  let scope={token:'owned-session',tenantKey:'tenant/a',workspaceKey:'same Ω',view};const calls=[];

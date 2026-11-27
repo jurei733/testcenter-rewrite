@@ -2,6 +2,7 @@ import type {OriginalGroupResult} from '@testcenter-rewrite-app/contracts/origin
 import type {OriginalAdminTestSession} from '@testcenter-rewrite-app/contracts/original-test-administration';
 import type {OriginalWorkspaceResultsTransport} from './original-workspace-results-http';
 import {originalAdministrationId} from './original-administration-wire';
+import {readOriginalGroupResultRows} from './original-group-result-rows';
 
 export type OriginalResultsView='results'|'tests';
 export type OriginalResultsScope={token:string;tenantKey:string;workspaceKey:string;view:OriginalResultsView};
@@ -49,13 +50,7 @@ export class OriginalWorkspaceResultsController {
  private async load(o:Owner):Promise<void>{
   const data=await this.request(o,'GET','/workspace/'+this.nativeId+(o.view==='results'?'/results':'/responses/detailed'));
   if(o.view==='results'){
-   const names=new Set<string>();
-   if(!Array.isArray(data))throw Error('Ungültige Ergebnisgruppen.');
-   this.rows=data.map(row=>{
-    if(!object(row)||typeof row['groupName']!=='string'||typeof row['groupLabel']!=='string'||names.has(row['groupName'])||
-     !['bookletsStarted','numUnitsMin','numUnitsMax','numUnitsTotal','numUnitsAvg','lastChange'].every(k=>typeof row[k]==='number'&&Number.isFinite(row[k])&&row[k]>=0))throw Error('Ungültige Ergebnisgruppe.');
-    names.add(row['groupName']);return {...row,checked:false} as OriginalResultRow;
-   });
+   this.rows=readOriginalGroupResultRows(data).map(row=>({...row,checked:false}));
   }else{
    // PHP emits [] for empty results and a JSON array for contiguous numeric
    // group keys. Entries also handle __proto__ without using object assignment.

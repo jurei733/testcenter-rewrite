@@ -146,7 +146,7 @@ export class NativeMonitorSessionService {
   const scope=token&&token===this.access()?.token?this.accessSignal:undefined;
   return this.readText(method,path,body,token,rawBody,signal,scope,true,subscribeToken,'application/json',false,deliveryId);
  }
- monitorSnapshot(path:string,signal:AbortSignal,subscribeToken:(value:string|null)=>void,rejected:(status:401|403,owner:AbortSignal)=>void):Promise<string>{
+ monitorSnapshot(path:string,signal:AbortSignal,subscribeToken?:(value:string|null)=>void,rejected:(status:401|403,owner:AbortSignal)=>void=()=>{}):Promise<string>{
   return this.readText('GET',path,undefined,this.access()?.token??'',false,signal,this.accessSignal,true,subscribeToken,
    'application/json',false,undefined,rejected);
  }
