@@ -288,6 +288,12 @@ export const navigationDirections = ['forward', 'backward'] as const;
 export type NavigationDirection = typeof navigationDirections[number];
 export type NavigationDirectionValue = 'yes' | 'no' | 'markedNo';
 export type NavigationDirections = Readonly<Record<NavigationDirection, NavigationDirectionValue>>;
+export interface UnitEntryNavigation {
+  unitSequenceId: number;
+  commandId?: string;
+  refreshTimer?: () => boolean;
+}
+
 export interface NavigationState {
   readonly targets: NavigationTargets;
   readonly directions: NavigationDirections;

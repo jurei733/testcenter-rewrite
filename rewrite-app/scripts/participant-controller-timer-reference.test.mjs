@@ -154,22 +154,27 @@ function extractNativeMethods(file, className, names) {
 
 const nativeTimerSource = `
 export const load = ({firstValueFrom, concat, defer, EMPTY, timer, createTicker, performance, AppError, sessionStorage,
-  MaxTimerEvent, concatMap, expand, filter, ignoreElements, take, takeUntil, tap}) => {
+  MaxTimerEvent, concatMap, expand, filter, ignoreElements, take, takeUntil, tap, UnitNavigationTarget, prepareNativePlayerHtml}) => {
  class TimerData {
   ${extractNativeMethods('classes/test-controller.classes.ts', 'TimerData', ['constructor', 'displayedSeconds'])}
  }
- return class NativeTestController {
+ class NativeTestController {
   ${extractNativeMethods('services/test-controller.service.ts', 'TestControllerService',
     ['startTimer', 'consumePausedTimerDisplay', 'restoreResumedTimerDisplay', 'readPausedTimerDisplays', 'writePausedTimerDisplays', 'takePausedTimerDisplay',
-      'confirmTimerExpiry', 'finishTimer', 'interruptTimer'])}
- };
+      'confirmTimerExpiry', 'finishTimer', 'interruptTimer', 'resume', 'pause'])}
+ }
+ class NativeUnitHost {
+  ${extractNativeMethods('components/unithost/unithost.component.ts', 'UnithostComponent', ['runUnit'])}
+ }
+ return {NativeTestController, NativeUnitHost};
 };`;
 const nativeTimerOutput = ts.transpileModule(nativeTimerSource, {
  compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext},
 }).outputText;
 const nativeTimerModule = await import('data:text/javascript;base64,' + Buffer.from(nativeTimerOutput).toString('base64'));
 
-async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDisplay, savedResumed, expiresAt}={}) {
+async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDisplay, savedResumed, expiresAt, nextClock,
+ prepareNativePlayerHtml = async html => html}={}) {
  const scheduler = new TestScheduler(assert.deepEqual);
  const startedAt = '2026-11-25T12:00:00.000Z';
  const clock = {
@@ -180,21 +185,25 @@ async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDi
  const resumedTimerKey = 'owned-resumed-timer';
  const savedTimers = new Map(savedDisplay ? [[pausedTimerKey, JSON.stringify(savedDisplay)]] : []);
  if(savedResumed)savedTimers.set(resumedTimerKey,JSON.stringify(savedResumed));
- const Controller = nativeTimerModule.load({
+ const {NativeTestController, NativeUnitHost} = nativeTimerModule.load({
   firstValueFrom, concat, defer, EMPTY, timer: delay => timer(delay, scheduler),
   createTicker: () => interval(100, scheduler), performance: {now: () => scheduler.now()}, AppError: Error,
   MaxTimerEvent: {STARTED: 'STARTED', STEP: 'STEP', ENDED: 'ENDED', INTERRUPTED: 'INTERRUPTED'},
   concatMap, expand, filter, ignoreElements, take, takeUntil, tap,
+  UnitNavigationTarget: {PAUSE:'pause'}, prepareNativePlayerHtml,
   sessionStorage: {getItem: key => savedTimers.get(key), setItem: (key, value) => savedTimers.set(key,value), removeItem: key => savedTimers.delete(key)},
  });
- const controller = new Controller();
- const unit = {alias: 'owned-unit'};
- const events = [], expirations = [];
+ const controller = new NativeTestController();
+ const unit = {alias: 'owned-unit', sequenceId: 2, parent: {timerId: 'timed'}};
+ const events = [], expirations = [], entries = [];
  Object.assign(controller, {
   nativeCurrent: true, currentUnit: unit, testMode: {forceTimeRestrictions: true}, pausedTimerKey,resumedTimerKey,
-  currentTimerId: '', timerIntervalSubscription: null, timers$: new Subject(), owned: subscribe => subscribe(), mds: {},
-  bs: {timer: (_id, _alias, action) => {
-   if (action === 'enter') return of(clock);
+  currentTimerId: '', timerRefreshId: 0, timerIntervalSubscription: null, timers$: new Subject(), owned: subscribe => subscribe(), mds: {},
+  bs: {timer: (_id, alias, action, _previousStartedAt, gotoCommandId, pausedDisplay) => {
+   if (action === 'enter') {
+    entries.push({alias, gotoCommandId, pausedDisplay});
+    return of(entries.length===1 ? clock : {...clock, ...nextClock});
+   }
    assert.equal(action, 'expire');
    const reply = replies[expirations.length];
    assert.ok(reply, 'unexpected extra expiry request');
@@ -207,7 +216,7 @@ async function nativeExpiryFixture(replies, {remainingMilliseconds=1000, savedDi
  });
  assert.equal(await controller.startTimer({id: 'timed'}, unit, false, () => true), true);
  const advance = frame => {scheduler.maxFrames = frame;scheduler.flush();};
- return {controller, expirations, events, advance, savedTimers, resumedTimerKey, pausedTimerKey};
+ return {controller, NativeUnitHost, unit, clock, entries, expirations, events, advance, savedTimers, resumedTimerKey, pausedTimerKey};
 }
 
 test('a reloaded timer restores the display only for the same server clock', async () => {
@@ -280,3 +289,103 @@ test('a late expiry response for a replaced server deadline cannot advance the o
  assert.deepEqual(fixture.events, [[0,'STARTED']]);
  fixture.controller.interruptTimer();
 });
+
+test('native Resume requests timed Unit entry even when its old countdown is still active', async () => {
+ const deadline = '2026-11-25T12:00:18.000Z';
+ const f = await nativeExpiryFixture([{status:'expired', remainingMilliseconds:0, expiresAt:deadline}],
+  {remainingMilliseconds:3000,nextClock:{expiresAt:deadline,remainingMilliseconds:2455,displayCeilingSeconds:2}});
+ f.advance(500);
+ const priorDisplay = f.controller.visibleTimer.data.displayedSeconds;
+ const navigations = [];
+ Object.assign(f.controller, {
+  state$: new BehaviorSubject('RUNNING'),
+  setUnitNavigationRequest: async (...args) => {navigations.push(args);return true;},
+  testlets: {timed: {id:'timed'}}, getPlayer: () => 'owned player', updateNavigationState: () => {},
+ });
+ assert.equal(await f.controller.resume(),true);
+ const [[target, force, entry]] = navigations;
+ assert.equal(target,'2');
+ assert.equal(force,true);
+ assert.equal(entry.unitSequenceId,2);
+ assert.equal(entry.refreshTimer(),true);
+ const host = new f.NativeUnitHost();
+ let ready = 0;
+ Object.assign(host,{tcs:f.controller,mds:{http:{isCurrent:true}},refreshTimer:entry.refreshTimer,prepareIframe:()=>{ready++;}});
+ f.unit.parent.locked = {by:'code'};
+ await host.runUnit();
+ assert.equal(f.entries.length,1);
+ assert.equal(ready,0);
+ f.unit.parent.locked = null;
+ await host.runUnit();
+ assert.equal(ready,1);
+ assert.deepEqual(f.entries,[{alias:f.unit.alias,gotoCommandId:undefined,pausedDisplay:undefined},
+  {alias:f.unit.alias,gotoCommandId:undefined,
+   pausedDisplay:{startedAt:f.clock.startedAt,expiresAt:f.clock.expiresAt,displayedSeconds:priorDisplay}}]);
+ assert.equal(f.controller.visibleTimer.data.displayedSeconds,2);
+ await host.runUnit();
+ assert.equal(f.entries.length,2);
+ f.advance(3000);
+ assert.deepEqual(f.expirations,[2955]);
+ assert.deepEqual(f.events,[[0,'STARTED'],[500,'STARTED'],[2955,'ENDED']]);
+});
+
+test('re-entering a running timer with the same deadline retains the existing ticker', async () => {
+ const f = await nativeExpiryFixture([{status:'expired',remainingMilliseconds:0}],
+  {remainingMilliseconds:3000,nextClock:{remainingMilliseconds:2500}});
+ f.advance(500);
+ const ticker = f.controller.timerIntervalSubscription;
+ assert.equal(await f.controller.startTimer({id:'timed'},f.unit,false,()=>true),true);
+ assert.equal(f.controller.timerIntervalSubscription,ticker);
+ assert.equal(f.entries.length,2);
+ f.advance(3000);
+ assert.deepEqual(f.expirations,[3000]);
+ assert.deepEqual(f.events,[[0,'STARTED'],[3000,'ENDED']]);
+});
+
+for (const pending of ['timer reply', 'timer error', 'player preparation']) {
+ test(`a newer Pause retires a pending Resume ${pending} before navigation completes`, async () => {
+  let prepare, readyToPrepare, finishPause;
+  const prepared = new Promise(resolve => {prepare = resolve;});
+  const preparing = new Promise(resolve => {readyToPrepare = resolve;});
+  const pausedNavigation = new Promise(resolve => {finishPause = resolve;});
+  const f = await nativeExpiryFixture([], {remainingMilliseconds: 3000,
+   prepareNativePlayerHtml: () => {readyToPrepare(); return prepared;}});
+  const reply = new Subject();
+  let resumeEntry;
+  Object.assign(f.controller, {
+   state$: new BehaviorSubject('RUNNING'),
+   setUnitNavigationRequest: async (target, _force, entry) => {
+    if (target === 'pause') return pausedNavigation;
+    resumeEntry = entry;
+    return true;
+   },
+   testlets: {timed: {id:'timed'}},
+   getPlayer: () => 'owned player',
+   updateNavigationState: () => {}
+  });
+  f.controller.bs.timer = () => reply;
+  await f.controller.resume();
+  const host = new f.NativeUnitHost();
+  let mounted = 0;
+  Object.assign(host, {tcs:f.controller, mds:{http:{isCurrent:true}}, refreshTimer:resumeEntry.refreshTimer,
+   prepareIframe: () => {mounted++;}});
+  const entering = host.runUnit();
+  if (pending === 'player preparation') {
+   reply.next(f.clock);
+   await preparing;
+  }
+  const pausing = f.controller.pause();
+  assert.equal(f.controller.state$.getValue(), 'PAUSED');
+  assert.equal(f.controller.currentTimerId, '');
+  if (pending === 'timer error') reply.error(Error('late owned timer error'));
+  else if (pending === 'timer reply') reply.next({...f.clock, expiresAt:'2026-11-25T12:00:18.000Z'});
+  prepare('owned player');
+  await entering;
+  assert.equal(f.controller.currentTimerId, '');
+  assert.equal(f.controller.timerIntervalSubscription, null);
+  assert.equal(host.mds.appError, undefined);
+  assert.equal(mounted, 0);
+  finishPause(true);
+  await pausing;
+ });
+}

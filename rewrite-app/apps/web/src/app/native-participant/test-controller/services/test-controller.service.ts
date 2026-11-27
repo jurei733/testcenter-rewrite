@@ -36,6 +36,7 @@ import {
   type TestStateKey,
   type TestStateUpdate,
   type Unit,
+  type UnitEntryNavigation,
   type UnitDataParts,
   UnitNavigationTarget, type UnitStateKey,
   type UnitStateUpdate,
@@ -147,6 +148,7 @@ export class TestControllerService {
   currentTimerId = '';
   private timerUnitAlias?: string;
   private visibleTimer?: { startedAt: string; expiresAt: string | null; data: TimerData };
+  private timerRefreshId = 0;
   private pausedTimers?: PausedTimerDisplay[];
   private timerIntervalSubscription: Subscription | null = null;
   timerWarningPoints: number[] = [];
@@ -379,6 +381,7 @@ export class TestControllerService {
   }
 
   reset(): void {
+    this.timerRefreshId += 1;
     this.players = {};
     this.sharedParameters = [];
 
@@ -558,7 +561,10 @@ export class TestControllerService {
 
   async startTimer(testlet: Testlet, unit: Unit, changedUnit: boolean, ownsEntry: () => boolean, gotoCommandId?: string): Promise<boolean> {
     const current=()=>this.nativeCurrent&&this.currentUnit===unit&&ownsEntry();
-    const saved=this.readPausedTimerDisplays().find(display=>display.testletKey===testlet.id);
+    const active = this.visibleTimer;
+    const saved = active?.data.id === testlet.id
+      ? { startedAt: active.startedAt, expiresAt: active.expiresAt, displayedSeconds: active.data.displayedSeconds }
+      : this.readPausedTimerDisplays().find(display => display.testletKey === testlet.id);
     const pausedHint=saved&&typeof saved.startedAt==='string'&&saved.startedAt.length<=32&&
       typeof saved.expiresAt==='string'&&saved.expiresAt.length<=32&&
       Number.isSafeInteger(saved.displayedSeconds)&&saved.displayedSeconds>=0
@@ -572,6 +578,13 @@ export class TestControllerService {
     }
     if(clock.testletKey!==testlet.id||!Number.isSafeInteger(clock.remainingMilliseconds)||clock.remainingMilliseconds<0){
       throw new Error('Ungültige serverseitige Testzeit.');
+    }
+    // Resume can also be issued while the authoritative timer is already running.
+    // In that case the existing subscription still owns the same deadline.
+    const visible = this.visibleTimer;
+    if (visible?.data.id === testlet.id && clock.status === 'running' && clock.remainingMilliseconds > 0 &&
+        visible.startedAt === clock.startedAt && visible.expiresAt === clock.expiresAt) {
+      return true;
     }
     this.finishTimer();
     if(clock.status==='paused'){
@@ -755,6 +768,7 @@ export class TestControllerService {
       gotoTarget = params[0];
     }
     if (gotoTarget && gotoTarget !== '0') {
+      this.timerRefreshId += 1;
       const targetUnit = this.units[parseInt(gotoTarget, 10)];
       if (targetUnit) {
         if (targetUnit.parent.timerId !== this.currentUnit?.parent.timerId) {
@@ -772,7 +786,7 @@ export class TestControllerService {
   }
 
   async setUnitNavigationRequest(navString: string, force = false,
-    gotoEntry?: {commandId:string;unitSequenceId:number}): Promise<boolean> {
+    unitEntry?: UnitEntryNavigation): Promise<boolean> {
     if (!this.booklet) {
       throw new AppError({
         label: 'Kein Booklet gefunden.',
@@ -808,12 +822,17 @@ export class TestControllerService {
       );
     default:
       const targetIsCurrent = this.currentUnitSequenceId.toString(10) === navString;
+      let reload = Date.now() >> 11;
+      if (unitEntry?.refreshTimer) {
+        reload = Date.now();
+        if (this.router.parseUrl(this.router.url).queryParams['reload'] === String(reload)) reload += 1;
+      }
       return this.router.navigate(
         [`/native-test/${this.testId}/u/${navString}`],
         {
           state: { force },
-          info: gotoEntry,
-          queryParams: targetIsCurrent ? { reload: Date.now() >> 11 } : {}
+          info: unitEntry,
+          queryParams: targetIsCurrent ? { reload } : {}
           //  unit shall be reloaded even if we are there already there
         }
       )
@@ -839,6 +858,7 @@ export class TestControllerService {
   }
 
   pause(): Promise<boolean> {
+    this.timerRefreshId += 1;
     if(this.visibleTimer){
       const {startedAt,expiresAt,data}=this.visibleTimer;
       const displays=this.readPausedTimerDisplays().filter(entry=>entry.testletKey!==data.id);
@@ -857,11 +877,19 @@ export class TestControllerService {
   }
 
   resume(): Promise<boolean> {
-    const target = this.currentUnit?.sequenceId ?? this.pausedResumeUnitSequenceId ??
+    const unit = this.currentUnit;
+    const target = unit?.sequenceId ?? this.pausedResumeUnitSequenceId ??
       this.getNavigationState(-Infinity).targets.next;
     if (target === null) return Promise.resolve(false);
+    const refreshId = ++this.timerRefreshId;
+    // The server can have paused this timer even if its PAUSE receipt never arrived.
+    // A newer command can take control before the old Unit navigation settles.
+    const entry: UnitEntryNavigation | undefined = this.currentTimerId && unit?.parent.timerId === this.currentTimerId
+      ? { unitSequenceId: target,
+        refreshTimer: () => this.timerRefreshId === refreshId && this.state$.getValue() === 'RUNNING' }
+      : undefined;
     this.state$.next('RUNNING');
-    return this.setUnitNavigationRequest(String(target), true);
+    return this.setUnitNavigationRequest(String(target), true, entry);
   }
 
   updateSingleLock(testlet: Testlet, key: TestletLockType, value: boolean): void {

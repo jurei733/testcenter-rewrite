@@ -148,20 +148,44 @@ test('parallel sibling progress cannot keep an independently stalled suite alive
    import {writeFile} from 'node:fs/promises';import {fileURLToPath} from 'node:url';
    const entry=name=>fileURLToPath(new URL(name,import.meta.url));
    await writeFile(entry('busy.mjs'),${JSON.stringify(`import {reportSmokePhase} from ${JSON.stringify(helper)};
-     let n=0;const timer=setInterval(()=>{reportSmokePhase('busy-'+n++);if(n===20)clearInterval(timer);},25);`)});
+     import {existsSync} from 'node:fs';
+     const reaped = new URL('./stalled-reaped', import.meta.url);
+     let step = 0;
+     const timer = setInterval(() => {
+       const stalledReaped = existsSync(reaped);
+       reportSmokePhase('busy-' + step++);
+       if (stalledReaped) clearInterval(timer);
+     }, 25);`)});
    await writeFile(entry('stalled.mjs'),${JSON.stringify(`import {reportSmokePhase} from ${JSON.stringify(helper)};
      reportSmokePhase('stalled');setInterval(()=>{},1000);`)});
-   const codes=await Promise.all(['busy','stalled'].map(name=>runSupervisedSmoke({entry:entry(name+'.mjs'),artifactDirectory:entry(name),
-     phaseTimeoutMs:250,totalTimeoutMs:1500,killGraceMs:30,forwardPhases:name})));
+   const run = name => runSupervisedSmoke({entry:entry(name+'.mjs'),artifactDirectory:entry(name),
+     phaseTimeoutMs:250,totalTimeoutMs:1500,killGraceMs:30,forwardPhases:name});
+   const codes = await Promise.all([
+     run('busy'),
+     run('stalled').then(async code => {
+       // The stalled supervisor resolves after it has reaped its child and persisted the evidence.
+       await writeFile(entry('stalled-reaped'), '');
+       return code;
+     })
+   ]);
    process.exitCode=codes.every(code=>code===0)?0:1;`,
   async (result, record, directory) => {
     assert.equal(result,1);assert.equal(record.outcome,'failed');
     const busy=JSON.parse(await readFile(join(directory,'busy','supervision.json'),'utf8'));
     const stalled=JSON.parse(await readFile(join(directory,'stalled','supervision.json'),'utf8'));
     assert.equal(busy.outcome,'passed');assert.equal(stalled.outcome,'phase-timeout');
-    assert.equal(stalled.phases.at(-1).phase,'stalled');
-    assert.ok(busy.phases.some(phase=>phase.at>stalled.failedAt),'The sibling must still be progressing after the stalled suite fails.');
-    assert.ok(record.phases.some(phase=>phase.phase.startsWith('busy:')));
+    const stalledPhase = stalled.phases.at(-1);
+    assert.equal(stalledPhase.phase, 'stalled');
+    assert.ok(stalled.ownedPids.includes(stalled.childPid));
+    const busyPhases = busy.phases.filter(({phase}) => phase.startsWith('busy-'));
+    assert.deepEqual(busyPhases.map(({phase}) => phase), busyPhases.map((_, index) => 'busy-' + index));
+    assert.ok(busyPhases.some(({at}) => stalledPhase.at <= at && at < stalled.failedAt),
+      'The sibling must progress while the stalled phase is still waiting.');
+    assert.ok(busyPhases.some(({at}) => at > stalled.failedAt),
+      'The sibling must still be progressing after the stalled suite fails.');
+    const lastBusyPhase = busyPhases.at(-1);
+    assert.ok(lastBusyPhase.at >= stalled.completedAt, 'The sibling must report progress after stalled cleanup completes.');
+    assert.ok(record.phases.some(({phase}) => phase === 'busy:' + lastBusyPhase.phase));
   },{phaseTimeoutMs:1000,totalTimeoutMs:3000}));
 
 test('the unchanged aggregate deadline reclaims nested supervised descendants and preserves unrelated work', async () => {

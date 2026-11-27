@@ -8,7 +8,7 @@ import {
 import { AsyncPipe, NgIf } from '@angular/common';
 import {MatCard,MatCardHeader,MatCardTitle,MatCardSubtitle} from '@angular/material/card';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, type Params } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { distinctUntilChanged, map, withLatestFrom } from 'rxjs/operators';
 import { CustomtextPipe, MainDataService } from '../../../shared/shared.module';
@@ -17,7 +17,7 @@ import { ThemeService } from '../../../shared/services/theme.service';
 import { CodeInputComponent } from '../../../shared/components/code-input/code-input.component';
 import { TestControllerService } from '../../services/test-controller.service';
 import { BackendService } from '../../services/backend.service';
-import { type NavigationState, isEqualNavigation } from '../../interfaces/test-controller.interfaces';
+import { type NavigationState, type UnitEntryNavigation, isEqualNavigation } from '../../interfaces/test-controller.interfaces';
 import {
   isVeronaNavigationTarget, type SharedParameter,
   type VeronaNavigationDeniedReason,
@@ -53,6 +53,7 @@ export class UnithostComponent implements OnInit, OnDestroy {
   private unitEntry=0;
   private gotoCommandId:string|undefined;
   private changedUnit=false;
+  private refreshTimer?: () => boolean;
   private playerLease:NativePlayerLease|undefined;
   private initialization:ReturnType<typeof setTimeout>|undefined;
   clearCode: string = '';
@@ -76,8 +77,9 @@ export class UnithostComponent implements OnInit, OnDestroy {
       if(this.destroyed||!this.mds.http.isCurrent)return;
       this.subscriptions.postMessage = this.mds.postMessage$
         .subscribe(messageEvent => {void this.handleIncomingMessage(messageEvent);});
-      this.subscriptions.routing = merge(this.route.queryParamMap, this.route.params)
-        .subscribe((params: Params) => (params.u ? this.open(Number(<Params>params.u)) : this.reload()));
+      this.subscriptions.routing = merge(this.route.queryParamMap, this.route.paramMap)
+        .pipe(map(() => this.route.snapshot), distinctUntilChanged())
+        .subscribe(snapshot => this.open(Number(snapshot.paramMap.get('u'))));
       this.subscriptions.navigationDenial = this.tcs.navigationDenial$
         .subscribe(navigationDenial => this.handleNavigationDenial(navigationDenial));
       this.subscriptions.conditionsEvaluated = merge(
@@ -318,8 +320,10 @@ export class UnithostComponent implements OnInit, OnDestroy {
     // The first subscription can run after navigation has completed. Router
     // info is scoped to that navigation and never restored from history.
     const navigation=this.router.currentNavigation()??this.router.lastSuccessfulNavigation();
-    const gotoEntry=navigation?.extras.info as {commandId:string;unitSequenceId:number}|undefined;
-    this.gotoCommandId=gotoEntry?.unitSequenceId===unitSequenceId?gotoEntry.commandId:undefined;
+    const entry = navigation?.extras.info as UnitEntryNavigation | undefined;
+    const isTarget = entry?.unitSequenceId === unitSequenceId;
+    this.gotoCommandId = isTarget ? entry.commandId : undefined;
+    this.refreshTimer = isTarget ? entry.refreshTimer : undefined;
     this.tcs.currentUnitSequenceId = unitSequenceId;
 
     if (!this.tcs.currentUnit) {
@@ -396,9 +400,12 @@ export class UnithostComponent implements OnInit, OnDestroy {
     const unit=this.tcs.currentUnit;
     const timerId=unit?.parent.timerId;
     const entry=this.unitEntry;
-    const ownsEntry=()=>!this.destroyed&&this.unitEntry===entry&&this.mds.http.isCurrent&&this.tcs.currentUnit===unit;
+    const refreshTimer = this.refreshTimer;
+    const ownsEntry = () => !this.destroyed && this.unitEntry === entry && this.mds.http.isCurrent &&
+      this.tcs.currentUnit === unit && (!refreshTimer || refreshTimer());
+    if (!unit || !ownsEntry()) return;
     try{
-      if(unit&&timerId&&timerId!==this.tcs.currentTimerId&&
+      if(timerId&&(timerId!==this.tcs.currentTimerId||refreshTimer)&&
         !await this.tcs.startTimer(this.tcs.testlets[timerId],unit,this.changedUnit,ownsEntry,this.gotoCommandId))return;
     }catch(error){
       if(ownsEntry()){
@@ -406,9 +413,10 @@ export class UnithostComponent implements OnInit, OnDestroy {
       }
       return;
     }
-    if(!unit||!ownsEntry())return;
+    if(!ownsEntry())return;
     const playerHtml = await prepareNativePlayerHtml(this.tcs.getPlayer(unit.playerFileName));
     if(!ownsEntry())return;
+    this.refreshTimer = undefined;
     this.prepareIframe(playerHtml);
     this.tcs.updateNavigationState();
   }
@@ -434,13 +442,6 @@ export class UnithostComponent implements OnInit, OnDestroy {
     const unit=this.tcs.currentUnit;
     this.playerLease=this.apiService.channel.bind(this.iFrameItemplayer,unit.alias,()=>!this.destroyed&&this.tcs.currentUnit===unit);
     this.iFrameItemplayer.setAttribute('srcdoc', playerHtml);
-  }
-
-  private reload(): void {
-    if (!this.tcs.currentUnitSequenceId || !this.tcs.currentUnit) {
-      return;
-    }
-    this.open(this.tcs.currentUnitSequenceId);
   }
 
   private getPlayerConfig(navigationState: NavigationState): VeronaPlayerConfig {
