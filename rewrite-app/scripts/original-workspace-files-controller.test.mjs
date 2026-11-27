@@ -272,6 +272,29 @@ test('numeric Files resolves current physical bytes by native type and escaped n
  assert.equal(packageDownload.current(),false);
 });
 
+test('numeric Files preserves distinct historical IDs for ambiguous filenames within a type', async () => {
+ const files = [
+  file('archive-left', 'images/asset.png', 'Resource'),
+  file('archive-right', 'alternate/asset.png', 'Resource'),
+  file('booklet', 'Booklet/shared.xml', 'Booklet'),
+  file('unit', 'Unit/shared.xml', 'Unit')
+ ];
+ const native = {...scope('a', 'read-token', [role('a', 'read_only')]), nativeRole: 'RO', workspaceNumber: '17'};
+ const f = fixture(call => normal(call, files), native);
+ await f.controller.connect();
+ const downloads = Object.fromEntries(f.controller.files.map(row => [
+  row.sourcePackageId, f.controller.captureDownload(row)
+ ]));
+ assert.deepEqual(downloads['archive-left'].headers, {authorization: 'Bearer read-token'});
+ assert.deepEqual(downloads['archive-right'].headers, {authorization: 'Bearer read-token'});
+ assert.equal(downloads['archive-left'].path, '/api/v1/tenants/a/workspaces/a/files/archive-left/download');
+ assert.equal(downloads['archive-right'].path, '/api/v1/tenants/a/workspaces/a/files/archive-right/download');
+ assert.equal(downloads.booklet.path, '/workspace/17/file/Booklet/shared.xml');
+ assert.equal(downloads.unit.path, '/workspace/17/file/Unit/shared.xml');
+ f.setScope({...native, workspaceNumber: '18'});
+ assert.ok(Object.values(downloads).every(download => !download.current()));
+});
+
 test('old confirmation and download ownership are invalid after workspace change, logout or destruction',async()=>{
  for(const transition of ['scope','logout','destroy']){
   const f=fixture(call=>normal(call));await f.controller.connect();f.controller.checkAll('Unit',true);

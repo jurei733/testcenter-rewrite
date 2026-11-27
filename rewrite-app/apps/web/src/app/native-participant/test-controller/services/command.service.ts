@@ -89,6 +89,7 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
 
   private subscribeReceivedCommands(): Subscription {
     let lastControllerCommand=0n;
+    let lastTimerCommand = 0n;
     return this.commandReceived$.pipe(
       filter(command => this.tcs.testId===this.ownedTestId && this.http.isCurrent && !this.executedCommandIds.includes(command.id) && !this.pendingCommands.has(command.id)),
       tap(command => this.pendingCommands.add(command.id)),
@@ -98,7 +99,8 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
       mergeMap(({command,testId}) => defer(() => this.http.isCurrent && testId === this.tcs.testId ?
         this.http.patch(`${this.backendUrl}test/${testId}/command/${command.id}/executed`,{}).pipe(
           filter(() => this.http.isCurrent && testId === this.tcs.testId),
-          map(() => command),tap(value => this.executedCommandIds.push(value.id))
+          map(() => ({command, recovered: this.unconfirmedAcks.delete(command.id)})),
+          tap(({command: confirmed}) => this.executedCommandIds.push(confirmed.id))
         ) : EMPTY).pipe(
           catchError((error: unknown) => {
             // The server may have committed the ACK before the connection broke.
@@ -106,6 +108,8 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
             // idempotent ACK when an owned command snapshot arrives again.
             if (error instanceof AppError && [0, 502, 503, 504].includes(error.code ?? -1)) {
               this.unconfirmedAcks.set(command.id, command);
+            } else {
+              this.unconfirmedAcks.delete(command.id);
             }
             this.connectionStatus$.next('error');
             this.recoverPolling();
@@ -114,11 +118,17 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
           finalize(() => this.pendingCommands.delete(command.id))
         )),
       takeUntil(fromEvent(this.http.accessSignal,'abort'))
-    ).subscribe(command => {
+    ).subscribe(({command, recovered}) => {
       const id=BigInt(command.id);
       const keyword=command.keyword.toLowerCase();
-      if(keyword==='goto'&&id<lastControllerCommand)return;
-      if((keyword==='pause'||keyword==='resume'||keyword==='terminate')&&id>lastControllerCommand)lastControllerCommand=id;
+      const controller = keyword === 'pause' || keyword === 'resume' || keyword === 'terminate';
+      const affectsTimer = controller || keyword === 'goto';
+      if (keyword === 'goto' && id < lastControllerCommand) return;
+      // An ACK retry can finish after a newer control. The server leaves that
+      // newer control in force, so skip the old command's local effect as well.
+      if (recovered && affectsTimer && id < lastTimerCommand) return;
+      if (controller && id > lastControllerCommand) lastControllerCommand = id;
+      if (affectsTimer && id > lastTimerCommand) lastTimerCommand = id;
       this.command$.next(command);
     });
   }
@@ -144,11 +154,7 @@ export class CommandService extends WebsocketBackendService<Command[]> implement
           this.cutConnection();
           return of([]);
         }),
-        switchMap(commands => {
-          const unconfirmed = [...this.unconfirmedAcks.values()];
-          this.unconfirmedAcks.clear();
-          return of(...unconfirmed, ...commands);
-        }),
+        switchMap(commands => of(...this.unconfirmedAcks.values(), ...commands)),
         takeUntil(fromEvent(this.http.accessSignal,'abort'))
       ).subscribe(this.commandReceived$);
   }

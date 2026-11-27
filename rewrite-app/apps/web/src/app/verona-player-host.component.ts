@@ -42,6 +42,7 @@ import {
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
 import type { ParticipantResponseFieldTimestamps, ParticipantTestLogEntryInput, TestRun } from "@testcenter-rewrite-app/domain";
+import { prepareNativePlayerHtml } from "./native-participant/native-player-html";
 import { OriginalPlayerNavigationComponent } from "./original-player-navigation.component";
 
 const controllerRecoveryStorageKey =
@@ -348,6 +349,7 @@ export class VeronaPlayerHostComponent
   currentPageIndex = -1;
 
   private frame: HTMLIFrameElement | null = null;
+  private mountGeneration = 0;
   private readyTimeout: ReturnType<typeof setTimeout> | null = null;
   private mountFrameRequest: number | null = null;
   private startPlayerRequest: number | null = null;
@@ -693,12 +695,17 @@ export class VeronaPlayerHostComponent
     this.changeDetector.detectChanges();
     this.mountFrameRequest = globalThis.window?.requestAnimationFrame(() => {
       this.mountFrameRequest = null;
-      this.attachPlayerFrame();
+      void this.attachPlayerFrame();
     }) ?? null;
   }
 
-  private attachPlayerFrame(): void {
+  private async attachPlayerFrame(): Promise<void> {
     if (this.status !== "loading") {
+      return;
+    }
+    const generation = this.mountGeneration;
+    const playerHtml = await prepareNativePlayerHtml(this.playerHtml);
+    if (generation !== this.mountGeneration || this.status !== "loading") {
       return;
     }
     const frame = document.createElement("iframe");
@@ -711,7 +718,7 @@ export class VeronaPlayerHostComponent
     );
     frame.setAttribute("allow", "clipboard-read; clipboard-write");
     frame.setAttribute("referrerpolicy", "no-referrer");
-    frame.setAttribute("srcdoc", this.playerHtml);
+    frame.setAttribute("srcdoc", playerHtml);
     frame.addEventListener(
       "load",
       () => {
@@ -1221,6 +1228,7 @@ export class VeronaPlayerHostComponent
   }
 
   private clearScheduledFrames(): void {
+    this.mountGeneration += 1;
     if (this.mountFrameRequest != null) {
       globalThis.window?.cancelAnimationFrame(this.mountFrameRequest);
       this.mountFrameRequest = null;

@@ -279,7 +279,10 @@ export class OriginalWorkspaceFilesController {
   }
   captureDownload(file:OriginalWorkspaceFile):{path:string;name:string;headers:Record<string,string>;current:()=>boolean}|null {
     const owner=this.owner;if(!owner || !this.owns(owner) || !this.files.includes(file))return null;
-    if(owner.workspaceNumber && file.fileType!=='Package'){
+    // Legacy catalog entries can share a basename within a type. Keep each
+    // listed entry downloadable by its own ID when the native address is ambiguous.
+    if (owner.workspaceNumber && file.fileType !== 'Package' &&
+        !this.files.some(candidate => candidate !== file && candidate.fileType === file.fileType && candidate.name === file.name)) {
       // The native address resolves the published file when the operator clicks,
       // including a revision published since this tab last loaded the catalog.
       const path='/workspace/'+encodeURIComponent(owner.workspaceNumber)+'/file/'+

@@ -178,6 +178,47 @@ for(const [code,retry] of [[0,true],[503,true],[404,false]])test(`native ACK rec
  t.mock.timers.tick(10000);assert.equal(f.started.length,2);
  assert.deepEqual(f.effects.map(value=>value.id),['1']);
 });
+for (const [older, newer, expected] of [
+  ['pause', 'resume', ['resume']],
+  ['resume', 'pause', ['pause']],
+  ['pause', 'terminate', ['terminate']],
+  ['terminate', 'resume', ['resume']],
+  ['pause', 'goto', ['goto']],
+  ['goto', 'pause', ['pause']],
+  ['goto', 'goto', ['goto']],
+  ['pause', 'debug', ['debug', 'pause']]
+]) {
+  test(`native recovery of ${older} ACK after a newer ${newer} ACK`, t => {
+    const f = commands(t);
+    const packets = new rx.Subject();
+    const {AppError} = load('app.interfaces.ts');
+    const first = {id: '9223372036854775806', keyword: older, arguments: [], timestamp: '1'};
+    const second = {id: '9223372036854775807', keyword: newer, arguments: [], timestamp: '2'};
+    f.service.observeEndpointAndChannel = () => packets;
+    f.tcs.testMode.receiveRemoteCommands = true;
+    f.tcs.state$.next('RUNNING');
+
+    packets.next([first, second]);
+    f.started[0].response.error(new AppError({code: 0, label: 'Owned failure', description: ''}));
+    t.mock.timers.tick(1000);
+    f.started[1].response.next(null);
+    f.started[1].response.complete();
+    assert.deepEqual(f.effects, [second]);
+
+    // Both first-time ACKs were committed. The recovered snapshot has neither.
+    packets.next([]);
+    t.mock.timers.tick(1000);
+    assert.equal(f.started.length, 3);
+    assert.equal(f.started[2].path, f.started[0].path);
+    packets.next([]);
+    f.started[2].response.next(null);
+    f.started[2].response.complete();
+    packets.next([]);
+    t.mock.timers.tick(1000);
+    assert.equal(f.started.length, 3);
+    assert.deepEqual(f.effects.map(command => command.keyword), expected);
+  });
+}
 test('access retirement drops an ambiguous ACK before the next command snapshot',t=>{
  const f=commands(t),packets=new rx.Subject(),{AppError}=load('app.interfaces.ts');
  f.service.observeEndpointAndChannel=()=>packets;

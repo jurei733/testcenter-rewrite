@@ -16748,6 +16748,10 @@ try {
         }),
       expectedParameters
     );
+  const lottiePlayerResource = page.waitForResponse(
+    response => /\/resources\/\.access\/r1\.[A-Za-z0-9_-]{43}\/avatar\/avatar\.json$/.test(new URL(response.url()).pathname),
+    { timeout: 30_000 }
+  ).catch(() => null);
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey: lottieTenantKey,
@@ -16765,6 +16769,8 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(lottieParticipantSessionId);
+  assert.equal((await lottiePlayerResource)?.status(), 200,
+    "The isolated Lottie Player should fetch the authored avatar before pointer input.");
   const lottieResourceResponse = await fetch(
     `${baseUrl}/api/v1/participant/sessions/${lottieParticipantSessionId}` +
       "/resources/avatar/avatar.json"

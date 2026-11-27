@@ -16,7 +16,7 @@ const source=readFileSync(new URL('../apps/web/src/app/verona-player-host.compon
 const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
 const decorator=()=>()=>{};
 const core={Component:decorator,Input:decorator,Output:decorator,HostListener:decorator,ViewChild:decorator,ViewEncapsulation:{None:0}};
-function fixture(){
+function fixture(prepareNativePlayerHtml = async html => html){
  let focused=true,hidden=false;const exports={};
  const document={hasFocus:()=>focused,get hidden(){return hidden;}};
  runInNewContext(code,{exports,require:name=>{
@@ -24,6 +24,7 @@ function fixture(){
   if(name==='@angular/common')return {CommonModule:class{}};
   if(name==='@testcenter-rewrite-app/contracts')return contracts;
   if(name==='@testcenter-rewrite-app/contracts/participant-response-capture')return capture;
+  if(name==='./native-participant/native-player-html')return {prepareNativePlayerHtml};
   if(name==='./original-player-navigation.component')return {OriginalPlayerNavigationComponent:class{}};
   throw Error(`Unexpected host dependency: ${name}`);
  },document,Date,setTimeout:(...args)=>setTimeout(...args),clearTimeout:(...args)=>clearTimeout(...args)});
@@ -58,6 +59,16 @@ test('window recovery retains the debounce and duplicate suppression',t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.host.lastFocusLogContent='HAS_NOT';
  f.host.scheduleFocusLog(false);f.host.onWindowFocus();t.mock.timers.tick(500);
  f.host.onWindowFocus();t.mock.timers.tick(500);assert.deepEqual(f.entries.map(x=>x.content),['HAS']);
+});
+test('an older Player preparation cannot attach after the frame has been retired', async () => {
+ const prepared = Promise.withResolvers();
+ const {host} = fixture(() => prepared.promise);
+ Object.assign(host, {status:'loading', mountGeneration:0, playerHtml:'old frame'});
+ const mounting = host.attachPlayerFrame();
+ host.clearScheduledFrames();
+ prepared.resolve('old frame');
+ await mounting;
+ assert.equal(host.frame, undefined);
 });
 test('focus evidence keeps only bounded focus metadata',()=>{
  const extra={token:'must-be-discarded',answer:'must-be-discarded',url:'must-be-discarded'};
