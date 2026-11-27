@@ -16,9 +16,9 @@ const row=(id='CHECK.A')=>({checkId:id,checkLabel:'Owned '+id,reportCount:501,la
  operatingSystemVersions:[{value:'Linux 6',count:501}],browserVersions:[{value:'Chromium 130',count:501}],overallRatings:[]});
 const normal=(call,rows=[row()],key='a')=>call.path.endsWith('/statistics')?{items:rows}:overview(key);
 const nativeRow=(id='Exact.Mixed',count=3)=>({id,count,label:'Owned '+id,details:{os:{'Linux 6':count},browser:{'Chromium 130':count}}});
-const fixture=(handler=normal,initial=scope())=>{
+const fixture=(handler=normal,initial=scope(),showOverviewFailure)=>{
  let current=initial;const calls=[];
- const controller=new Controller(async(method,path,body,token)=>{const call={method,path,body,token};calls.push(call);return handler(call);},()=>current,()=>{});
+ const controller=new Controller(async(method,path,body,token)=>{const call={method,path,body,token};calls.push(call);return handler(call);},()=>current,()=>{},showOverviewFailure);
  return {controller,calls,setScope:value=>{current=value;}};
 };
 
@@ -288,6 +288,40 @@ test('retired numeric download responses release neither a file nor an error',as
   else reply.resolve(new Blob(['old private report']));
   assert.equal(await pending,null);
   assert.deepEqual([...f.controller.selected],['A']);
+  assert.equal(f.controller.problem,'');
+ }
+});
+test('a single numeric workspace overview owns its replacement rows and its failure',async()=>{
+ const replacement=held(),failure={statusCode:403,message:'Anmeldung ungültig.'},shown=[];
+ let calls=0;
+ const f=fixture(()=>calls++?replacement.promise:[nativeRow('A')],{...scope(),workspaceNumber:'12'},
+   (error,path,current)=>shown.push({error,path,current:current()}));
+ await f.controller.connect();f.controller.checkAll();
+ assert.equal(f.calls.length,1);
+ assert.deepEqual([...f.controller.selected],['A']);
+ const pending=f.controller.refresh();
+ assert.equal(f.controller.busy,true);
+ assert.deepEqual(f.controller.rows,[]);
+ assert.equal(f.controller.selected.size,0);
+ assert.equal(f.controller.captureDeletion(),null);
+ replacement.reject(failure);await pending;
+ assert.equal(f.controller.busy,false);
+ assert.deepEqual(f.controller.rows,[]);
+ assert.equal(f.controller.problem,'');
+ assert.deepEqual(shown,[{error:failure,path:'/workspace/12/sys-check/reports/overview',current:true}]);
+ assert.ok(f.calls.every(call=>call.path==='/workspace/12/sys-check/reports/overview'&&call.token==='owned-token'));
+});
+test('retired numeric overview responses cannot show rows or failures for the next scope',async()=>{
+ for(const fails of [false,true]){
+  const reply=held();
+  const f=fixture(call=>call.path.includes('/12/')?reply.promise:[nativeRow('NEW')],{...scope(),workspaceNumber:'12'},
+    ()=>assert.fail('A retired overview cannot show a failure.'));
+  const previous=f.controller.connect();
+  f.setScope({...scope(),workspaceNumber:'21'});await f.controller.connect();
+  if(fails)reply.reject({statusCode:403,message:'Old request.'});
+  else reply.resolve([nativeRow('OLD')]);
+  await previous;
+  assert.deepEqual(f.controller.rows.map(row=>row.checkId),['NEW']);
   assert.equal(f.controller.problem,'');
  }
 });

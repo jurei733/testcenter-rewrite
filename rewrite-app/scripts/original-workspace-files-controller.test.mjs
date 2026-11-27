@@ -24,6 +24,23 @@ const fixture=(handler,initial=scope(),uploadSettled=()=>{})=>{
  return {controller,calls,changes,setScope:value=>{current=value;}};
 };
 const normal=(call,rows=[file()])=>call.path.endsWith('/files')?{items:rows,totalCount:rows.length,dependencySizesCalculated:true}:overview();
+test('an inactive numeric Files tab retires pending data and can reload only when it becomes active',async()=>{
+ const response=pending();
+ const f=fixture(call=>call.path.endsWith('/files')&&f.calls.length<=2?response.promise:normal(call),
+   {...scope(),workspaceNumber:'17',nativeRole:'RW'});
+ const previous=f.controller.connect();
+ await f.controller.connect(false);await f.controller.refresh();
+ assert.equal(f.calls.length,2);
+ response.resolve(normal({path:'/files'},[file('old')]));
+ await previous;
+ assert.deepEqual(f.controller.files,[]);
+ assert.equal(f.controller.overview,null);
+ assert.equal(f.controller.canWrite,false);
+ await f.controller.connect();
+ assert.equal(f.calls.length,4);
+ assert.deepEqual(f.controller.files.map(item=>item.sourcePackageId),['UNIT']);
+ assert.equal(f.controller.canWrite,true);
+});
 test('application mode refresh follows actual upload responses, including errors, but not failed local file reads',async()=>{
  let refreshes=0,posted=0;
  const f=fixture(call=>{if(call.method==='POST'){if(++posted===1)throw Error('Owned rejected XML');return{sourcePackage:file()};}return normal(call);},scope(),()=>refreshes++);

@@ -20,7 +20,7 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
       <app-original-workspace-files
         [sessionToken]="state.ops.adminSessionToken"
         [tenantKey]="active.tenantKey" [workspaceKey]="active.workspaceKey"
-        [workspaceNumber]="active.workspaceNumber" [nativeRole]="active.mode" />
+        [workspaceNumber]="active.workspaceNumber" [workspaceLabel]="active.label" [nativeRole]="active.mode" />
     } @else {
       <app-original-workspace-file-surface-styles />
     }

@@ -45,6 +45,7 @@ export class OriginalWorkspaceFilesComponent implements AfterViewInit,OnChanges,
  @Input({required:true}) tenantKey='';
  @Input({required:true}) workspaceKey='';
  @Input() workspaceNumber='';
+ @Input() workspaceLabel='';
  @Input() nativeRole?:'RO'|'RW';
  private readonly state=inject(RewriteAppUiStateService);
  private readonly request=inject(RewriteAppShellRequestService);
@@ -97,7 +98,7 @@ export class OriginalWorkspaceFilesComponent implements AfterViewInit,OnChanges,
    this.deletion?.close(false);
    this.deletionError?.close();
    // On a workspace switch, wait for the verified scope inputs in ngOnChanges.
-   if(workspaceNumber===this.workspaceNumber)void this.controller.connect();
+   if(workspaceNumber===this.workspaceNumber)this.connectFilesTab();
  });
  readonly fileTypes:WorkspaceFileType[]=['Testtakers','Booklet','SysCheck','Unit','Resource','Package'];
  readonly labels:Record<WorkspaceFileType,string>={Testtakers:'Teilnehmerlisten',Booklet:'Testhefte',SysCheck:'Systemcheck-Definitionen',Unit:'Units',Resource:'Ressourcen',Package:'Pakete'};
@@ -124,7 +125,10 @@ export class OriginalWorkspaceFilesComponent implements AfterViewInit,OnChanges,
      this.tabNavigation.updateActiveLink();
    });
  }
- ngOnChanges():void {this.deletion?.close(false);this.deletionError?.close();this.resultsRole='';void this.controller.connect();}
+ ngOnChanges():void {this.deletion?.close(false);this.deletionError?.close();this.resultsRole='';this.connectFilesTab();}
+ private connectFilesTab():void {
+   void this.controller.connect(!this.workspaceNumber || this.tab==='files');
+ }
  ngOnDestroy():void {
    this.destroyed=true;this.routeChanges.unsubscribe();this.deletion?.close(false);this.deletionError?.close();
    this.controller.destroy();this.header.title.set('Verwaltung');
@@ -134,9 +138,10 @@ export class OriginalWorkspaceFilesComponent implements AfterViewInit,OnChanges,
    this.header.title.set(this.title);
  }
  get title():string {
-   const workspace=this.controller.overview?.workspace;
-   const role=(this.tab==='results'||this.tab==='tests')&&this.resultsRole?this.resultsRole:this.controller.canWrite?'RW':'RO';
-   return workspace ? `Verwaltung "${workspace.displayName}" (${role})` : 'Verwaltung';
+   const label=this.workspaceNumber?this.workspaceLabel:this.controller.overview?.workspace.displayName;
+   const role=(this.tab==='results'||this.tab==='tests')&&this.resultsRole?this.resultsRole:
+     this.nativeRole??(this.controller.canWrite?'RW':'RO');
+   return label ? `Verwaltung "${label}" (${role})` : 'Verwaltung';
  }
  size(bytes:number|null):string {
    if(bytes===null || !Number.isFinite(bytes))return 'nicht berechnet';

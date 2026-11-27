@@ -6,7 +6,7 @@ import type {OriginalWorkspaceFilesScope,OriginalWorkspaceFilesTransport} from '
 type Scope=Pick<OriginalWorkspaceFilesScope,'token'|'tenantKey'|'workspaceKey'|'nativeRole'|'workspaceNumber'>;
 type Owner=Omit<Scope,'nativeRole'>&{epoch:number};
 type NativeReportOverview={id:string;label:string;count:number;details:{os:Record<string,number>;browser:Record<string,number>}};
-type ReportDownloadFailure=(error:unknown,path:string,current:()=>boolean)=>void;
+type NativeReportFailure=(error:unknown,path:string,current:()=>boolean)=>void;
 type ReportDeletionConfirmation={
  ids:string[];
  current:()=>boolean;
@@ -30,7 +30,7 @@ export class OriginalSystemCheckReportsController {
  private owner:Owner|null=null;
  private destroyed=false;
  constructor(private readonly transport:OriginalWorkspaceFilesTransport,
-  private readonly current:()=>Scope,private readonly changed:()=>void){}
+  private readonly current:()=>Scope,private readonly changed:()=>void,private readonly showOverviewFailure?:NativeReportFailure){}
  private owns(owner:Owner):boolean {
   const scope=this.current();return !this.destroyed && this.owner===owner && this.epoch===owner.epoch &&
    !!owner.token && owner.token===scope.token && owner.tenantKey===scope.tenantKey && owner.workspaceKey===scope.workspaceKey &&
@@ -56,12 +56,25 @@ export class OriginalSystemCheckReportsController {
  }
  private async load(owner:Owner):Promise<void>{
   const native=this.nativePath(owner,'sys-check/reports/overview');
+  if(native){
+   this.rows=[];this.selected=new Set();this.changed();
+   try{
+    const items=await this.request<NativeReportOverview[]>(owner,'GET',native);
+    if(!this.owns(owner))return;
+    this.rows=items.map(row=>({
+     checkId:row.id,checkLabel:row.label,reportCount:row.count,
+     operatingSystemVersions:versions(row.details.os),browserVersions:versions(row.details.browser)
+    }));
+   }catch(error){
+    if(!this.owns(owner))return;
+    if(!this.showOverviewFailure)throw error;
+    this.showOverviewFailure(error,native,()=>this.owns(owner));
+   }
+   return;
+  }
   const [scope,rows]=await Promise.all([
    this.request<GetWorkspaceOverviewResponse>(owner,'GET',productionApiRoutes.workspace.getWorkspaceOverview),
-   native ? this.request<NativeReportOverview[]>(owner,'GET',native).then(items=>items.map(row=>({
-    checkId:row.id,checkLabel:row.label,reportCount:row.count,
-    operatingSystemVersions:versions(row.details.os),browserVersions:versions(row.details.browser)
-   }))) : this.request<GetSystemCheckReportStatisticsResponse>(owner,'GET',productionApiRoutes.workspace.getSystemCheckReportStatistics)
+   this.request<GetSystemCheckReportStatisticsResponse>(owner,'GET',productionApiRoutes.workspace.getSystemCheckReportStatistics)
     .then(result=>result.items)]);
   if(!this.owns(owner))return;
   const overview=scope.workspaceOverview;
@@ -83,7 +96,7 @@ export class OriginalSystemCheckReportsController {
   try{await this.load(owner);}catch(error){if(this.owns(owner))this.problem=errorText(error);}
   finally{if(this.owns(owner)){this.busy=false;this.changed();}}
  }
- async download(read:(path:string,token:string)=>Promise<Blob>,showFailure?:ReportDownloadFailure):Promise<{blob:Blob;current:()=>boolean}|null>{
+ async download(read:(path:string,token:string)=>Promise<Blob>,showFailure?:NativeReportFailure):Promise<{blob:Blob;current:()=>boolean}|null>{
   const owner=this.owner;if(!owner || !this.owns(owner) || this.busy || !this.selected.size)return null;
   const ids=this.rows.filter(row=>this.selected.has(row.checkId)).map(row=>row.checkId);if(!ids.length)return null;
   const native=this.nativePath(owner,'report/sys-check');
@@ -117,7 +130,7 @@ export class OriginalSystemCheckReportsController {
   }
  }
  captureDeletion():ReportDeletionConfirmation|null {
-  const owner=this.owner;if(!owner || !this.owns(owner) || !this.overview || this.busy)return null;
+  const owner=this.owner;if(!owner || !this.owns(owner) || (!owner.workspaceNumber && !this.overview) || this.busy)return null;
   const ids=this.rows.filter(row=>this.selected.has(row.checkId)).map(row=>row.checkId);if(!ids.length)return null;
   let used=false;
   return {ids:[...ids],current:()=>this.owns(owner),confirm:async (showNotice,showFailure)=>{

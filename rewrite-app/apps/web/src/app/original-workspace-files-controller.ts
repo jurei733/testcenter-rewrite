@@ -128,13 +128,14 @@ export class OriginalWorkspaceFilesController {
     this.files=catalog.items.map(file=>({...file,name:basename(file.fileName),isChecked:false}));
     this.selectedRowId='';this.order();
   }
-  async connect():Promise<void> {
+  async connect(loadFiles=true):Promise<void> {
     this.uploadAbort?.abort();
     this.uploadAbort=null;
     const scope=this.current();this.epoch++;
-    const owner={epoch:this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey,workspaceNumber:scope.workspaceNumber};this.owner=owner;
+    const owner={epoch:this.epoch,token:scope.token,tenantKey:scope.tenantKey,workspaceKey:scope.workspaceKey,workspaceNumber:scope.workspaceNumber};
+    this.owner=loadFiles?owner:null;
     this.grouped.clear();this.files=[];this.dependencySizesCalculated=false;this.overview=null;this.uploads=[];this.nativeUploadProgress=null;this.deletionReport=null;this.problem='';this.notice=null;this.selectedRowId='';
-    this.busy=!!owner.token && !!owner.tenantKey && !!owner.workspaceKey;this.changed();
+    this.busy=loadFiles && !!owner.token && !!owner.tenantKey && !!owner.workspaceKey;this.changed();
     if(!this.busy)return;
     try { await this.load(owner); }
     catch(error) {if(this.owns(owner))this.problem=problemText(error,'Dateien konnten nicht geladen werden.');}

@@ -60,7 +60,8 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
   this.request.request<T>('Systemcheck Berichte',method,path,body,{quiet:true,headers:{authorization:'Bearer '+token}}),
   ()=>({token:this.state.ops.adminSessionToken.trim(),tenantKey:this.tenantKey,workspaceKey:this.workspaceKey,
     workspaceNumber:this.workspaceNumber,nativeRole:this.nativeRole}),
-  ()=>{if(!this.destroyed){this.data.data=this.controller.rows;this.changed.markForCheck();}});
+  ()=>{if(!this.destroyed){this.data.data=this.controller.rows;this.changed.markForCheck();}},
+  (error,path,current)=>this.showReportError(error,path,current,'overview'));
  @ViewChild(MatSort) set sort(value:MatSort){this.data.sort=value;}
  constructor(){
   this.data.sortingDataAccessor=(row,key)=>key==='syscheckLabel'?row.checkLabel:key==='number'?row.reportCount:
@@ -99,11 +100,11 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
   });
  }
 
- private showReportError(error:unknown,path:string,current:()=>boolean,operation:'download'|'deletion'):void {
+ private showReportError(error:unknown,path:string,current:()=>boolean,operation:'overview'|'download'|'deletion'):void {
   if(this.destroyed || this.reportError || !current())return;
   const apiError=this.api.isApiError(error)?error:null;
   const response=apiError?.response;
-  const transportFailure=operation==='download'&&error instanceof TypeError;
+  const transportFailure=operation!=='deletion'&&error instanceof TypeError;
   const mapped=nativeRequestError(apiError||transportFailure?new HttpErrorResponse({
     status:apiError?.statusCode??0,error:apiError?.message??'error',statusText:response?.statusText,
     url:new URL(path,window.location.origin).href,
@@ -135,8 +136,8 @@ export class OriginalSystemCheckReportsComponent implements OnChanges,OnDestroy 
           this.state.ops.adminAccessWindowNotice='';
           this.persistence.persistShellState();
         }
-        const destination=operation==='download'?'native-start/bookmarked-starter':
-          mapped.type==='session'?'native-start/login':'native-start/dispatch';
+        const destination=mapped.type==='session'?'native-start/login':
+          operation==='deletion'?'native-start/dispatch':'native-start/bookmarked-starter';
         window.location.assign(new URL(destination,document.baseURI).href);
       }
     } satisfies NativeErrorDialogData
