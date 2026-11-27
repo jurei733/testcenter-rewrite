@@ -39,6 +39,13 @@ export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPo
     return {participantSessionId: person.participantSessionId, tenantId: person.tenantId, workspaceId: person.workspaceId,
       originalLoginKey: person.originalLoginKey!, groupKey: person.groupKey, mode: person.originalOperationalMode as OriginalMonitorActor['mode']};
   };
+  const studyMonitor = async (token: string): Promise<OriginalMonitorActor> => {
+    const monitor = await actor(token);
+    if (monitor.mode !== 'monitor-study') {
+      throw new FirstSliceError(403, 'original_study_monitor_forbidden', 'A current study monitor is required.');
+    }
+    return monitor;
+  };
   return {
     async requireMonitor({token,groupKey}) {const monitor=await actor(token);if(groupKey!==undefined)originalMonitorGroupSelection(monitor,groupKey);},
     async changeLocks({token,groupKey,locked,body}) {
@@ -68,19 +75,26 @@ export function createOriginalMonitorPort(input: {auth: OriginalAuthenticationPo
     },
     async sessions({token, groupKey}) {return formatOriginalMonitorSessionsJson(await input.repository.readOriginalMonitorSessions(await actor(token), groupKey));},
     async studyResults({token, workspacePathSegment, groups}) {
-      const monitor = await actor(token);
-      if (monitor.mode !== 'monitor-study') {
-        throw new FirstSliceError(403, 'original_study_monitor_forbidden', 'A current study monitor is required.');
-      }
+      const monitor = await studyMonitor(token);
       let reference: string;
       try { reference = decodeURIComponent(workspacePathSegment); }
       catch { throw new FirstSliceError(400, 'original_study_workspace_invalid', 'Invalid workspace path.'); }
+      const missing = () => new FirstSliceError(404, 'original_study_workspace_not_found', 'Workspace not found.');
       const number = parseOriginalWorkspaceNumber(reference);
-      const scope = number ? await input.repository.findOriginalWorkspaceAdministrationScope(number) : null;
-      if (!scope || scope.tenantId !== monitor.tenantId || scope.workspaceId !== monitor.workspaceId) {
-        throw new FirstSliceError(404, 'original_study_workspace_not_found', 'Workspace not found.');
-      }
+      if (!number) throw missing();
+      const scope = await input.repository.findOriginalWorkspaceAdministrationScope(number);
+      if (scope?.tenantId !== monitor.tenantId || scope.workspaceId !== monitor.workspaceId) throw missing();
       const inventory = await input.repository.getOriginalGroupResultInventory(scope.tenantId, scope.workspaceId);
+      // Do not publish an inventory read under a permission that ended while it was pending.
+      const currentScope = await input.repository.findOriginalWorkspaceAdministrationScope(number);
+      const currentMonitor = await studyMonitor(token);
+      if (currentScope?.tenantId !== scope.tenantId || currentScope.workspaceId !== scope.workspaceId ||
+          currentMonitor.tenantId !== scope.tenantId || currentMonitor.workspaceId !== scope.workspaceId) {
+        throw missing();
+      }
+      if (currentMonitor.participantSessionId !== monitor.participantSessionId) {
+        throw new FirstSliceError(403, 'original_study_monitor_forbidden', 'A current study monitor is required.');
+      }
       return projectOriginalGroupResults({...inventory, tenantId: scope.tenantId, workspaceId: scope.workspaceId,
         selectedGroups: groups ? groups.split(',') : undefined});
     }

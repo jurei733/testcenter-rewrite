@@ -41,6 +41,9 @@ export class AdminPasswordChangeService {
       { headers: { authorization: `Bearer ${sessionToken}` } }
     );
 
+    if (this.uiState.ops.adminSessionToken.trim() !== sessionToken) {
+      return;
+    }
     this.uiState.ops.adminSessionView = prettyPrintJson(
       payload,
       this.uiState.ops.adminSessionView

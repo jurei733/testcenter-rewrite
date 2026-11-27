@@ -121,35 +121,40 @@ test("shell polling recovers after rejection and follows the current route", asy
   });
 });
 
-test("a delayed administrator sign-out cannot clear the replacement login", async () => {
-  const source = readFileSync(new URL("../apps/web/src/app/admin-password-change.service.ts", import.meta.url), "utf8");
-  const {outputText} = ts.transpileModule(source, {
-    compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, experimentalDecorators: true}
+for (const [action, expectedPath] of [
+  ["sign-out", "/api/v1/admin/auth/sign-out"],
+  ["password change", "/api/v1/admin/auth/password"]
+]) {
+  test(`a delayed administrator ${action} cannot clear the replacement login`, async () => {
+    const source = readFileSync(new URL("../apps/web/src/app/admin-password-change.service.ts", import.meta.url), "utf8");
+    const {outputText} = ts.transpileModule(source, {
+      compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, experimentalDecorators: true}
+    });
+    const reply = deferred();
+    const ops = {adminSessionToken: "first-session", adminSessionView: "Current account"};
+    const request = async (_label, method, path, _body, options) => {
+      assert.equal(method, "POST");
+      assert.equal(path, expectedPath);
+      assert.equal(options.headers.authorization, "Bearer first-session");
+      return reply.promise;
+    };
+    const unexpectedUpdate = () => assert.fail("A superseded administrator request must leave the live account intact.");
+    const modules = {
+      "@angular/core": {Injectable: () => target => target, inject: value => value},
+      "@testcenter-rewrite-app/contracts": {productionApiRoutes: {admin: {signOut: expectedPath, changeOwnPassword: expectedPath}}},
+      "./rewrite-app-shell-feedback.service": {RewriteAppShellFeedbackService: {rememberActivity: unexpectedUpdate}},
+      "./rewrite-app-shell-persistence.service": {RewriteAppShellPersistenceService: {persistShellState: unexpectedUpdate}},
+      "./rewrite-app-shell-request.service": {RewriteAppShellRequestService: {request}},
+      "./rewrite-app-shell.readers": {prettyPrintJson: unexpectedUpdate},
+      "./rewrite-app-ui-state.service": {RewriteAppUiStateService: {ops, setAdminSessionToken: unexpectedUpdate}}
+    };
+    const exports = {};
+    new Function("exports", "require", outputText)(exports, name => modules[name]);
+    const service = new exports.AdminPasswordChangeService();
+    const pending = action === "sign-out" ? service.signOut() : service.changePassword({password: "fixture-replacement"});
+    ops.adminSessionToken = "replacement-session";
+    reply.resolve({adminSession: {adminSessionId: "revoked-first"}});
+    await pending;
+    assert.deepEqual(ops, {adminSessionToken: "replacement-session", adminSessionView: "Current account"});
   });
-  const reply = deferred();
-  const ops = {adminSessionToken: "first-session", adminSessionView: "Current account"};
-  const request = async (_label, method, path, _body, options) => {
-    assert.equal(method, "POST");
-    assert.equal(path, "/api/v1/admin/auth/sign-out");
-    assert.equal(options.headers.authorization, "Bearer first-session");
-    return reply.promise;
-  };
-  const unexpectedUpdate = () => assert.fail("A superseded sign-out must leave the live account intact.");
-  const modules = {
-    "@angular/core": {Injectable: () => target => target, inject: value => value},
-    "@testcenter-rewrite-app/contracts": {productionApiRoutes: {admin: {signOut: "/api/v1/admin/auth/sign-out"}}},
-    "./rewrite-app-shell-feedback.service": {RewriteAppShellFeedbackService: {rememberActivity: unexpectedUpdate}},
-    "./rewrite-app-shell-persistence.service": {RewriteAppShellPersistenceService: {persistShellState: unexpectedUpdate}},
-    "./rewrite-app-shell-request.service": {RewriteAppShellRequestService: {request}},
-    "./rewrite-app-shell.readers": {prettyPrintJson: unexpectedUpdate},
-    "./rewrite-app-ui-state.service": {RewriteAppUiStateService: {ops, setAdminSessionToken: unexpectedUpdate}}
-  };
-  const exports = {};
-  new Function("exports", "require", outputText)(exports, name => modules[name]);
-  const service = new exports.AdminPasswordChangeService();
-  const signingOut = service.signOut();
-  ops.adminSessionToken = "replacement-session";
-  reply.resolve({adminSession: {adminSessionId: "revoked-first"}});
-  await signingOut;
-  assert.deepEqual(ops, {adminSessionToken: "replacement-session", adminSessionView: "Current account"});
-});
+}

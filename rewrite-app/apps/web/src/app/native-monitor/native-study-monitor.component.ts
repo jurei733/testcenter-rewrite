@@ -172,8 +172,12 @@ export class NativeStudyMonitorComponent {
           this.status.set(rows.length ? 'current' : 'empty');
         } catch (error) {
           if (scope.aborted) return;
-          if (error instanceof NativeMonitorHttpError && error.status === 404) {
-            this.data.data = [];
+          if (error instanceof NativeMonitorHttpError) {
+            if (error.status === 410) {
+              this.session.clear();
+              return;
+            }
+            if (error.status === 404) this.data.data = [];
           }
           this.status.set('retry');
         } finally {

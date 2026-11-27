@@ -153,6 +153,37 @@ for (const kind of kinds) test(`${kind}: actual native monitor materialization a
       assert.equal(after.mode, 'run-trial'); assert.equal(after.groupLabel, 'Changed Ω group'); assert.deepEqual(after.testState, before.testState); assert.deepEqual(after.unitState, before.unitState);
       await importRoster();
     });
+    await t.test('study aggregate publication requires the same current permission after the inventory read', {timeout: 10000}, async () => {
+      const readScope = {workspacePathSegment: nativeWorkspace, groups: group};
+      const expected = await services.originalGroupResults.list({...scope, groups: [group]});
+      assert.equal(expected.length, 1);
+      const readWithBoundary = async (access, change, verify) => {
+        const entered = Promise.withResolvers();
+        const release = Promise.withResolvers();
+        const delayed = {...repository, async getOriginalGroupResultInventory(tenantId, workspaceId) {
+          const inventory = await repository.getOriginalGroupResultInventory(tenantId, workspaceId);
+          entered.resolve();
+          await release.promise;
+          return inventory;
+        }};
+        const reader = createFirstSliceServices({repository: delayed}).originalMonitor;
+        const pending = reader.studyResults({...readScope, token: access.token});
+        const verified = verify(pending);
+        try {
+          await Promise.race([entered.promise, pending.then(() => {
+            throw new Error('The study aggregate bypassed the held inventory boundary.');
+          })]);
+          await change();
+        } finally {
+          release.resolve();
+          await verified;
+        }
+      };
+      await readWithBoundary(study, () => {}, pending => pending.then(rows => assert.deepEqual(rows, expected)));
+      await readWithBoundary(study, () => services.originalSession.logout({token: study.token}),
+        pending => assert.rejects(pending, rejected(401)));
+      study = await services.originalSession.login({name: studyName, password});
+    });
     if (kind === 'sqlite' || kind === 'postgres') await t.test('production HTTP protects native monitor snapshots with real challenge login, current roles and group scope', async () => {
       const env = {FIRST_SLICE_STORE: kind, FIRST_SLICE_SQLITE_FILE: file, FIRST_SLICE_BOOTSTRAP_DEMO: 'false', FIRST_SLICE_OPERATOR_AUTH_REQUIRED: 'true', FIRST_SLICE_XML_SCHEMA_PROFILE: 'original-19', REQUIRE_LOGIN_PASSWORD: 'false',
         FIRST_SLICE_PROOF_OF_WORK_SCOPES: 'participant,second_code', FIRST_SLICE_PROOF_OF_WORK_SECRET: 'owned-monitor-sessions-http-secret-not-production', FIRST_SLICE_PROOF_OF_WORK_PREVIOUS_SECRET: '', FIRST_SLICE_PROOF_OF_WORK_MAX_NUMBER: '12', FIRST_SLICE_PROOF_OF_WORK_TTL_MS: '60000', ...(url ? {FIRST_SLICE_POSTGRES_URL: url.toString()} : {})};
