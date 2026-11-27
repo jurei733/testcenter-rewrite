@@ -1,5 +1,5 @@
 import {DatePipe, DecimalPipe} from '@angular/common';
-import {Component, effect, inject, signal, untracked, viewChild} from '@angular/core';
+import {Component, computed, effect, inject, signal, untracked, viewChild} from '@angular/core';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, RouterLink} from '@angular/router';
 import {MatSort, MatSortHeader} from '@angular/material/sort';
@@ -38,7 +38,10 @@ import {NativeMonitorHttpError, NativeMonitorSessionService} from './native-sess
     .study-table { flex: 1; min-height: 0; overflow: auto; }
     .study-table:focus-visible { outline: 2px solid var(--mat-sys-primary); outline-offset: -2px; }
     mat-table { min-width: 720px; }
+    mat-header-row { background: white; }
     .mat-column-groupName { flex: 0 0 150px; background: white; }
+    .study-status { margin: 0; }
+    .study-status:not(:empty) { margin-bottom: 12px; }
     .study-retry { flex: 0 0 auto; margin-bottom: 12px; }
     @media (max-width: 720px) {
       .study-panel { margin: 8px; padding: 12px; }
@@ -55,6 +58,7 @@ import {NativeMonitorHttpError, NativeMonitorSessionService} from './native-sess
     </mat-toolbar></header>
     <main class="study-content">
       <section class="study-panel">
+        <p class="study-status" role="status">{{ resultStatus() }}</p>
         @if (status() === 'retry') {
           <div class="study-retry">
             <p role="alert">
@@ -70,7 +74,7 @@ import {NativeMonitorHttpError, NativeMonitorSessionService} from './native-sess
           <p role="alert">Dieser Arbeitsbereich ist für Sie nicht freigegeben.</p>
         }
         <div class="study-table" role="region" aria-label="Studienergebnisse" tabindex="0" [attr.aria-busy]="refreshing()">
-          <mat-table [dataSource]="data" matSort aria-label="Studienmonitor">
+          <mat-table [dataSource]="data" [trackBy]="trackGroup" matSort aria-label="Studienmonitor">
             @for (column of columns; track column.key) {
               <ng-container [matColumnDef]="column.key" [sticky]="column.key === 'groupName'">
                 <mat-header-cell *matHeaderCellDef mat-sort-header [class.quantity]="column.key !== 'groupName'">
@@ -86,7 +90,7 @@ import {NativeMonitorHttpError, NativeMonitorSessionService} from './native-sess
                 </mat-cell>
               </ng-container>
             }
-            <mat-header-row *matHeaderRowDef="columnKeys" />
+            <mat-header-row *matHeaderRowDef="columnKeys; sticky: true" />
             <mat-row *matRowDef="let row; columns: columnKeys" />
           </mat-table>
         </div>
@@ -106,7 +110,15 @@ export class NativeStudyMonitorComponent {
   ] as const;
   readonly columnKeys = this.columns.map(column => column.key);
   readonly data = new MatTableDataSource<OriginalGroupResult>();
-  readonly status = signal<'current'|'retry'|'denied'|'signed-out'>('current');
+  readonly trackGroup = (_index: number, row: OriginalGroupResult) => row.groupName;
+  readonly status = signal<'loading'|'empty'|'current'|'retry'|'denied'|'signed-out'>('loading');
+  readonly resultStatus = computed(() => {
+    switch (this.status()) {
+      case 'loading': return 'Studienergebnisse werden geladen.';
+      case 'empty': return 'In diesem Arbeitsbereich wurde noch kein Testheft gestartet.';
+      default: return '';
+    }
+  });
   readonly refreshing = signal(false);
   private retryCurrent?: () => void;
   private readonly sort = viewChild(MatSort);
@@ -120,14 +132,19 @@ export class NativeStudyMonitorComponent {
     inject(NativePublicHeaderService).setTitle('Studienmonitor');
     inject(NativeThemeContext).activate(this.owner.signal);
     inject(NativeAssetContext).activate(this.owner.signal);
-    this.data.sortingDataAccessor = (row, key) =>
-      key === 'groupName' ? row.groupLabel : row[key as keyof OriginalGroupResult];
+    const compareGroupLabels = new Intl.Collator('de-DE', {numeric: true, sensitivity: 'base'}).compare;
+    const sortResults = this.data.sortData.bind(this.data);
+    this.data.sortData = (rows, sort) => {
+      if (sort.active !== 'groupName' || !sort.direction) return sortResults(rows, sort);
+      const direction = sort.direction === 'asc' ? 1 : -1;
+      return rows.sort((left, right) => direction * compareGroupLabels(left.groupLabel, right.groupLabel));
+    };
     effect(() => { this.data.sort = this.sort() ?? null; });
     effect(onCleanup => {
       const workspace = this.params().get('workspace');
       const access = this.session.access();
       this.data.data = [];
-      this.status.set('current');
+      this.status.set('loading');
       this.refreshing.set(false);
       if (!workspace || !access?.claims.studyMonitor?.some(claim => claim.id === workspace) || access.flags.includes('codeRequired')) {
         this.status.set(access ? 'denied' : 'signed-out');
@@ -150,8 +167,9 @@ export class NativeStudyMonitorComponent {
         try {
           const response = await this.session.monitorSnapshot('/workspace/' + encodeURIComponent(workspace) + '/studyresults', scope);
           scope.throwIfAborted();
-          this.data.data = readOriginalGroupResultRows(JSON.parse(response));
-          this.status.set('current');
+          const rows = readOriginalGroupResultRows(JSON.parse(response));
+          this.data.data = rows;
+          this.status.set(rows.length ? 'current' : 'empty');
         } catch (error) {
           if (scope.aborted) return;
           if (error instanceof NativeMonitorHttpError && error.status === 404) {
