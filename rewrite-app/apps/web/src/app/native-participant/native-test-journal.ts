@@ -106,8 +106,15 @@ export class NativeTestJournal {
   this.base=parseNativeTestStateBase(base);
  }
  /** Only future events use the command ACK snapshot. Existing staged entries
-  * retain their original contexts even when Source groups them in one packet. */
- useCommandBase(base:NativeTestStateBase):void{this.current();this.base=parseNativeTestStateBase(base);}
+  * retain their original contexts even when Source groups them in one packet.
+  * Command responses can arrive out of order and both server clocks are monotone. */
+ useCommandBase(base: NativeTestStateBase): void {
+  this.current();
+  const next = parseNativeTestStateBase(base);
+  if (next.revision > this.base.revision && next.controlEpoch >= this.base.controlEpoch) {
+   this.base = next;
+  }
+ }
  freeze(kind: 'state'|'log', body: unknown[]): NativeTestDelivery {
   const doc=this.read(this.ownBucket),previous=kind==='state'?doc.entries.find(row=>row.kind==='state'&&row.phase==='staged'):undefined;
   const row:Entry={id:previous?.id??this.crypto.randomUUID(),kind,queuedAt:previous?.queuedAt??Date.now(),phase:'ready',payload:JSON.stringify(body),

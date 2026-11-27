@@ -27596,10 +27596,11 @@ export const createFirstSliceServices = (
         mediaType,encodedWorkspaceDocument(member.bytes,mediaType));
       probe.sourcePackageId='unpersisted-member-'+index;
       const projected=projectWorkspaceFile(probe);
+      const {identifier}=workspaceFileReplacementIdentity(projected);
       const typeOrder=workspaceUploadOrder.indexOf(projected.fileType);
       const unrecognizedXml=typeOrder===0&&/\.xml$/i.test(fileName);
       const order=typeOrder<0||unrecognizedXml?workspaceUploadOrder.length:typeOrder;
-      return{...member,index,mediaType,sourceDocument:probe.sourceDocument!,order,projected};
+      return{...member,index,mediaType,sourceDocument:probe.sourceDocument!,order,projected,identifier};
     }).sort((a,b)=>a.order-b.order||a.index-b.index);
     // Original validates Resource+Unit as a category before Booklet and roster.
     // Its upload-time unused warnings describe that cache, not the final graph.
@@ -27614,10 +27615,26 @@ export const createFirstSliceServices = (
     if(hasUnitUpload)for(const file of categoryCatalog.items.filter(value=>value.fileType==='Unit'))for(const relation of file.dependencies){
       const target=categoryFiles.get(relation.sourcePackageId);if(target?.fileType==='Resource')usedResourceIds.add((relation.relationship==='usesPlayer'?target.fileName.split('/').at(-1)!:target.metadata.identifier).replace(/[a-z]/g,letter=>letter.toUpperCase()));
     }
-    const finalResourceCandidate=new Map(candidates.filter(member=>member.order===0).map(member=>[workspaceFileReplacementIdentity(member.projected).identifier,member]));
+    // A Unit replaces the primary cache entry only when its ID and basename
+    // match. Unit members keep their archive order.
+    const cachedUnitsById=new Map<string,{fileName:string;index?:number}>();
+    for(const file of categoryInputs){
+      if(file.fileType!=='Unit')continue;
+      const {identifier}=workspaceFileReplacementIdentity(file);
+      if(!cachedUnitsById.has(identifier))cachedUnitsById.set(identifier,{fileName:file.fileName.split(/[\\/]/).at(-1)!});
+    }
+    const supersededUnitMembers=new Set<number>();
     for(const member of candidates){
-      const identity=workspaceFileReplacementIdentity(member.projected);
-      const unused=member.order===1||member.order===2||member.order===0&&finalResourceCandidate.get(identity.identifier)===member&&!usedResourceIds.has(identity.identifier);
+      if(member.projected.fileType!=='Unit')continue;
+      const cached=cachedUnitsById.get(member.identifier);
+      if(cached&&cached.fileName!==member.fileName)continue;
+      if(cached?.index!==undefined)supersededUnitMembers.add(cached.index);
+      cachedUnitsById.set(member.identifier,member);
+    }
+    const finalResourceCandidate=new Map(candidates.filter(member=>member.order===0).map(member=>[member.identifier,member]));
+    for(const member of candidates){
+      const unused=(member.order===1&&!supersededUnitMembers.has(member.index))||member.order===2||
+        (member.order===0&&finalResourceCandidate.get(member.identifier)===member&&!usedResourceIds.has(member.identifier));
       const validationReport=readWorkspaceFileReport(member.projected,{unused,...(/\.itcr\.zip$/i.test(member.fileName)?{archiveEntries:readZipEntries(Buffer.from(member.bytes.buffer,member.bytes.byteOffset,member.bytes.byteLength),10_000)?.length}:{})});
       try{
         const result=await uploadPhysicalWorkspaceFile({...scope,fileName:member.fileName,mediaType:member.mediaType,sourceDocument:member.sourceDocument},
@@ -27640,7 +27657,7 @@ export const createFirstSliceServices = (
         if(error.errorCode==='workspace_file_identifier_duplicate'){
           const id=error.details&&typeof error.details==='object'&&'conflictingSourcePackageId'in error.details?error.details.conflictingSourcePackageId:null;
           const duplicate=typeof id==='string'?await repository.getSourcePackageById(id):null;
-          if(duplicate)diagnostics.splice(0,diagnostics.length,`Duplicate ${member.projected.fileType}-Id: \`${identity.identifier}\` (${duplicate.fileName.split('/').at(-1)})`);
+          if(duplicate)diagnostics.splice(0,diagnostics.length,`Duplicate ${member.projected.fileType}-Id: \`${member.identifier}\` (${duplicate.fileName.split('/').at(-1)})`);
         }
         for(const message of diagnostics)appendWorkspaceFileReport(validationReport,'error',message);
         entries.push({entryName:member.entryName,fileName:member.fileName,status:'rejected',validationReport,sourcePackageId:null,message:diagnostics.join('\n')||error.message,errorCode:error.errorCode});

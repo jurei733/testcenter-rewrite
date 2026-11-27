@@ -72,3 +72,50 @@ test('a command ACK authorizes only subsequent entries while preserving one exac
  assert.equal(packet.payload,JSON.stringify(body));assert.deepEqual(packet.base,{...base,segments:[{start:2,revision:10,controlEpoch:4}]});
  a.close();await turn();const b=await f.open(),[recovered]=b.recoveries();assert.deepEqual(recovered.base,packet.base);assert.equal(recovered.payload,packet.payload);
 });
+
+test('a delayed command ACK cannot move future journal entries back to an older server revision', async t => {
+ const f = fixture();
+ t.after(() => f.close());
+ const initial = {version: 1, revision: 4, controlEpoch: 2};
+ const latePause = {version: 1, revision: 5, controlEpoch: 3};
+ const resume = {version: 1, revision: 6, controlEpoch: 3};
+ const newState = {version: 1, revision: 7, controlEpoch: 3};
+ const nextControl = {version: 1, revision: 8, controlEpoch: 4};
+ const journal = await f.open(undefined, undefined, initial);
+ const before = state('before command');
+ const connection = (content, timeStamp) => [{key: 'CONNECTION', content, timeStamp}];
+ const afterResume = connection('WEBSOCKET', 124);
+ const afterLatePause = connection('POLLING', 125);
+ const afterNewState = connection('WEBSOCKET', 126);
+ const afterNextControl = connection('POLLING', 127);
+
+ journal.captureState(before);
+ journal.useCommandBase(resume);
+ journal.captureState(afterResume);
+ journal.useCommandBase({...resume});
+ journal.useCommandBase(latePause);
+ journal.captureState(afterLatePause);
+ journal.useCommandBase(newState);
+ journal.captureState(afterNewState);
+ journal.useCommandBase(nextControl);
+ journal.captureState(afterNextControl);
+
+ const body = [...before, ...afterResume, ...afterLatePause, ...afterNewState, ...afterNextControl];
+ const packet = journal.freeze('state', body);
+ assert.equal(packet.payload, JSON.stringify(body));
+ assert.deepEqual(packet.base, {
+  ...initial,
+  segments: [
+   {start: 1, revision: 6, controlEpoch: 3},
+   {start: 3, revision: 7, controlEpoch: 3},
+   {start: 4, revision: 8, controlEpoch: 4}
+  ]
+ });
+ journal.close();
+ await turn();
+ const reopened = await f.open(undefined, undefined, nextControl);
+ const [recovered] = reopened.recoveries();
+ assert.equal(recovered.id, packet.id);
+ assert.equal(recovered.payload, packet.payload);
+ assert.deepEqual(recovered.base, packet.base);
+});

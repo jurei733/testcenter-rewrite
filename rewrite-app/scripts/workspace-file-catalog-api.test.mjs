@@ -9,6 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {Pool} from 'pg';
 import test from 'node:test';
 import {raceWithSmokeDeadline} from './smoke-deadline.mjs';
+import {workspaceZip} from './workspace-zip-fixture.mjs';
 import {createFirstSliceServices} from '@testcenter-rewrite-app/application';
 import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory-store';
 
@@ -277,7 +278,7 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       assert.deepEqual(deletedRows.map(row=>row.subjectId).sort(),sources.map(row=>row.sourcePackageId).sort());
       assert.equal((await api(scope+'/files')).totalCount,6);
     });
-    await t.test('native multipart uploads validate in dependency order and keep exact bytes',async()=>{
+    await t.test('native multipart uploads validate in dependency order and keep exact bytes',async t=>{
       const workspaceKey='owned-native-upload';
       await api('/api/v1/tenants/demo-tenant/workspaces',{workspaceKey,displayName:'Owned native upload'},'POST',201);
       const scoped='/api/v1/tenants/demo-tenant/workspaces/'+workspaceKey;
@@ -323,8 +324,8 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       assert.ok(mixed['../outside.bin'].error.length);
       for(const name of ['custom-player.html','raw.bin','unit.xml','booklet.xml'])assert.ok(!mixed[name].error,name);
       assert.equal((await api(scoped+'/files')).totalCount,4);
-      const download=async(type,name)=>{
-        const response=await fetch(base+workspace+'/file/'+type+'/'+name,{headers:{AuthToken:writer}});
+      const download=async(type,name,actor=writer)=>{
+        const response=await fetch(base+workspace+'/file/'+type+'/'+name,{headers:{AuthToken:actor}});
         assert.equal(response.status,200);return Buffer.from(await response.arrayBuffer());
       };
       assert.deepEqual(await download('Resource','raw.bin'),raw);
@@ -344,6 +345,41 @@ for(const kind of kinds)test(kind+': complete protected file catalog preserves b
       assert.equal(createHash('sha256').update(archive).digest('hex'),archiveInput.archiveSha256);
       const original=JSON.parse(readFileSync(join(sourceFixture,'observations.json'))).rows.find(row=>row.label===archiveInput.label);
       assert.deepEqual(await send([[archiveInput.name,archive]],201),original.value);
+
+      await t.test('same-basename ZIP Units warn only on the remaining cache entry',async()=>{
+        const fileName='bestand.xml';
+        const unitRevision=label=>Buffer.from(xml('Unit','ZIP.UNIT',
+          '<Definition player="catalog-player@1.2.9">owned</Definition>',`<Label>${label}</Label>`));
+        const first=['z-alpha/'+fileName,unitRevision('Alpha')];
+        const second=['a-beta/'+fileName,unitRevision('Beta')];
+        const seed=unitRevision('Initial');
+        assert.deepEqual(await send([[fileName,seed]],201),{[fileName]:{warning:['Unit is never used']}});
+        assert.deepEqual(await download('Unit',fileName,reader),seed);
+
+        const actualReports=[],expectedReports=[];
+        const overwritten='File of name `bestand.xml` did already exist and was overwritten.';
+        for(const [zipName,members] of [['first.zip',[first,second]],['reverse.zip',[second,first]]]){
+          const upload=[[zipName,workspaceZip(members,{deflate:true})]];
+          await send(upload,403,reader);
+          actualReports.push(await send(upload,201));
+          expectedReports.push(Object.fromEntries(members.map(([path],index)=>[
+            zipName+'_Extract/'+path,{warning:index===0?[overwritten]:['Unit is never used',overwritten]}
+          ])));
+
+          const events=await api(scoped+'/activity-events?limit=500&eventType=source_package_replaced');
+          const replacements=events.items.map(row=>row.activityEvent.details).filter(row=>row.archiveFileName===zipName);
+          assert.deepEqual(replacements.map(row=>row.archiveEntryName).sort(),members.map(([path])=>path).sort());
+          for(const [path,bytes] of members){
+            const id=replacements.find(row=>row.archiveEntryName===path).replacementSourcePackageId;
+            const saved=await fetch(base+scoped+'/source-packages/'+id+'/download',{headers:{Authorization:'Bearer '+token}});
+            assert.equal(saved.status,200);
+            assert.deepEqual(Buffer.from(await saved.arrayBuffer()),bytes);
+          }
+          assert.deepEqual(await download('Unit',fileName),members[1][1]);
+          assert.deepEqual(await download('Unit',fileName,reader),members[1][1]);
+        }
+        assert.deepEqual(actualReports,expectedReports);
+      });
     });
     const replacement=await api(scope+'/source-packages/'+created[1].sourcePackageId+'/replacements',{
       fileName:'booklet.xml',mediaType:'application/xml',

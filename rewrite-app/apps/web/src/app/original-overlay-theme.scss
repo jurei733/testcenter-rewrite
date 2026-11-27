@@ -19,6 +19,7 @@
   .original-native-monitor-confirmation-dialog,
   .original-native-monitor-filter-options,
   .original-application-logo-tooltip,
+  .original-system-check-navigation-tooltip,
   .original-native-login-error-dialog,
   .original-participant-error-dialog,
   .original-native-participant-snackbar,
@@ -62,6 +63,7 @@
 
 // Rewrite's general button hover lifts by one pixel; the pinned Material
 // dialogs do not. Keep the correction local to these Original renderers.
+:root[data-interface-mode='original'] .original-system-check-save-report-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-administration-editor-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog button.mat-mdc-button-base:hover,

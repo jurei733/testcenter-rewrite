@@ -21,11 +21,13 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
       @let confirmationOpen = view.native?.savedReportConfirmationOpen() ?? false;
       <div class="header" [attr.inert]="confirmationOpen ? '' : null">
         <h2>Systemcheck: {{ view.systemCheck?.displayLabel ?? view.native?.label() }}</h2>
-        <button id="syscheck-previous-step" matFab matTooltip="Zurück" aria-label="Zurück"
+        <button id="syscheck-previous-step" matFab matTooltip="Zurück"
+          matTooltipClass="original-system-check-navigation-tooltip" aria-label="Zurück"
           [disabled]="!view.systemCheck || view.stepIndex === 0 || (view.busy && !confirmationOpen) || view.networkBusy" (click)="view.previousStep()">
           <mat-icon svgIcon="keyboard_arrow_left" />
         </button>
-        <button id="syscheck-next-step" matFab matTooltip="Weiter" aria-label="Weiter"
+        <button id="syscheck-next-step" matFab matTooltip="Weiter"
+          matTooltipClass="original-system-check-navigation-tooltip" aria-label="Weiter"
           [disabled]="!view.systemCheck || view.nextButtonDisabled || view.networkBusy" (click)="view.nextStep()">
           <mat-icon svgIcon="keyboard_arrow_right" />
         </button>
@@ -87,6 +89,7 @@ import { OriginalSystemCheckReportComponent } from "./original-system-check-repo
     .mat-mdc-card-title { margin-bottom: 10px; }
     table, tbody, tr, td { box-sizing: content-box; }
     button.mat-mdc-fab { font: revert; }
+    button.mat-mdc-fab:hover { transform: none; }
     button.mat-mdc-fab:disabled { opacity: 1; }
   `],
   styleUrl: "./original-system-check-content-theme.scss"

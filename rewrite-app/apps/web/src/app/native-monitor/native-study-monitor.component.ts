@@ -39,7 +39,7 @@ import {NativeMonitorHttpError, NativeMonitorSessionService} from './native-sess
     .study-table:focus-visible { outline: 2px solid var(--mat-sys-primary); outline-offset: -2px; }
     mat-table { min-width: 720px; }
     mat-header-row { background: white; }
-    .mat-column-groupName { flex: 0 0 150px; background: white; }
+    .mat-column-groupName { min-width: 150px; overflow-wrap: anywhere; background: white; }
     .study-status { margin: 0; }
     .study-status:not(:empty) { margin-bottom: 12px; }
     .study-retry { flex: 0 0 auto; margin-bottom: 12px; }

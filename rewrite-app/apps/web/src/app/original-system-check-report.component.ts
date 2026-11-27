@@ -61,6 +61,7 @@ import { OriginalSystemCheckSaveReportComponent } from "./original-system-check-
     .flex-row-center { display:flex; flex-direction:row; justify-content:center; }
     mat-card { width:810px; }
     mat-card:not(.native-report) { min-width:0; max-width:100%; }
+    mat-card-actions button.mat-mdc-raised-button:hover { transform:none; }
     ul li { word-break:break-all; margin:3px; }
     #systemCheckReportQuestionnaire > ul { margin-block-end: 0; }
     .warning-text { color:red; font-weight:bold; }
