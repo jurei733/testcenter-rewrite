@@ -1016,9 +1016,12 @@ for(const kind of kinds)test(`${kind}: real native Test creation is durable, sco
         const timerStart=await nativeRequest('PATCH',timerPath,timerPerson.person.token,timerBody);
         const firstTimer=JSON.parse(timerStart.text);
         assert.equal(timerStart.headers.get('cache-control'),'private, no-store');
-        assert.deepEqual(Object.keys(firstTimer).sort(),['expiresAt','remainingMilliseconds','startedAt','status','testletKey']);
+        assert.deepEqual(Object.keys(firstTimer).sort(),['exitPhase','expiresAt','remainingMilliseconds','startedAt','status','testletKey']);
+        assert.equal(typeof firstTimer.exitPhase,'string');
+        assert.ok(firstTimer.exitPhase.length>0);
         assert.equal(firstTimer.remainingMilliseconds,60000);
         const continuedTimer=JSON.parse((await nativeRequest('PATCH',timerPath,timerPerson.person.token,timerBody)).text);
+        assert.equal(continuedTimer.exitPhase,firstTimer.exitPhase);
         assert.equal(continuedTimer.expiresAt,firstTimer.expiresAt);
         assert.ok(continuedTimer.remainingMilliseconds<=firstTimer.remainingMilliseconds);
         await nativeRequest('GET','/test/'+expected,httpPerson.login.token,undefined,403);await nativeRequest('GET','/test/'+expected,other.person.token,undefined,403);
