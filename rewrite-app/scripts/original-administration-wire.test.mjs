@@ -19,6 +19,15 @@ test('native self identity is numeric while workspace claim identities remain st
  assert.equal(value.id,'9007199254740993');assert.equal(value.claims.workspaceAdmin[0].id,'9223372036854775807');
  assert.throws(()=>parse('/session','{"id":"1","token":"owned","claims":{"superAdmin":[],"workspaceAdmin":[]}}'));
 });
+test('native workspace administration accepts absent superadmin claims and rejects malformed present claims', () => {
+ const session = claims => parse('/session', JSON.stringify({id:1, token:'owned', claims}));
+ assert.deepEqual(session({workspaceAdmin:[]}).claims, {workspaceAdmin:[]});
+ assert.deepEqual(session({workspaceAdmin:[], superAdmin:[]}).claims, {workspaceAdmin:[], superAdmin:[]});
+ for (const superAdmin of [null, false, 'invalid', {}, 1]) {
+  assert.throws(() => session({workspaceAdmin:[], superAdmin}), /native Verwaltungssitzung/);
+ }
+ assert.throws(() => session({superAdmin:[]}), /native Verwaltungssitzung/);
+});
 test('complete matrix body preserves unknown and selected-empty opaque memberships and clears unselected rows',()=>{
  assert.deepEqual(body([{id:'9007199254740993',selected:true,role:'',name:'a'},{id:'2',selected:true,role:'OTHER',name:'b'},{id:'3',selected:false,role:'',name:'c'}]),[
   {id:'9007199254740993',role:'\0'},{id:'2',role:'OTHER'},{id:'3',role:''}]);

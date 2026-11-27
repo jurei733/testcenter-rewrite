@@ -107,6 +107,10 @@ export class RewriteAppOperatorAccessService {
     return this.session?.adminUser?.passwordChangeRequired === true && !this.isPlatformAdmin;
   }
 
+  get requiresWorkspacePasswordChange(): boolean {
+    return this.requiresPasswordChange && !this.isMonitorOnly && !this.isSystemCheckOnly;
+  }
+
   get canReadWorkspaceDirectory(): boolean {
     return (
       this.mode === "signed_out" ||

@@ -18,6 +18,7 @@ import {
 import { OperatorAccountPanelComponent } from "./operator-account-panel.component";
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { AdminPasswordDialogsComponent } from "./admin-password-dialogs.component";
+import { OriginalRequiredPasswordFlowComponent } from "./original-required-password-flow.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
 import { BugReportDialogComponent } from "./bug-report-dialog.component";
@@ -32,6 +33,7 @@ import { OriginalWorkspaceOperatorHeaderComponent, OriginalWorkspaceOperatorHead
 import { OriginalApplicationLogoComponent } from "./original-application-logo.component";
 import { ParticipantShellStateService } from "./participant-shell-state.service";
 import type { AppView } from "./rewrite-app-shell.types";
+import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { SummaryCardsComponent } from "./summary-cards.component";
 import { NativeErrorPresenterService } from "./native-error-presenter.service";
 import { openNativeSystemCheckInstallationError } from "./native-system-check/native-system-check-installation-error";
@@ -54,6 +56,7 @@ const routeViews: AppView[] = [
     NgTemplateOutlet,
     OperatorAccountPanelComponent,
     AdminPasswordDialogsComponent,
+    OriginalRequiredPasswordFlowComponent,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
@@ -75,6 +78,7 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor() { inject(NativeErrorPresenterService).register(openNativeSystemCheckInstallationError); }
   readonly interfaceMode = inject(InterfaceModeService);
   readonly app = inject(AppShellFacade);
+  readonly adminSessionOwnerGeneration = inject(RewriteAppUiStateService).adminSessionOwnerGeneration;
   readonly originalWorkspaceHeader = inject(OriginalWorkspaceOperatorHeaderState);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly bugReports = inject(BugReportService);
@@ -92,6 +96,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly routeVersion = signal(0);
+  private readonly originalPasswordRedirectInfo = {};
+  private originalPasswordRedirectSource: { owner: number; url: string } | null = null;
   private readonly routerEventsSubscription = this.router.events.subscribe(
     event => {
       if (event instanceof NavigationEnd) {
@@ -111,6 +117,41 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     }
   );
+  private readonly enforceOriginalWorkspacePasswordFlow = effect(onCleanup => {
+    this.app.renderVersion();
+    const owner = this.adminSessionOwnerGeneration();
+    const url = this.router.url;
+    const navigation = this.router.currentNavigation();
+    if (this.isOriginalOperatorStarter ||
+        !this.requiresOriginalWorkspacePasswordFlow ||
+        isExplicitOriginalAdminLogin(url)) {
+      this.originalPasswordRedirectSource = null;
+      return;
+    }
+    if (navigation) {
+      if (navigation.extras.info !== this.originalPasswordRedirectInfo) {
+        this.originalPasswordRedirectSource = null;
+      }
+      return;
+    }
+    const previous = this.originalPasswordRedirectSource;
+    if (previous?.owner === owner && previous.url === url) return;
+
+    let current = true;
+    onCleanup(() => { current = false; });
+    queueMicrotask(() => {
+      if (!current || this.router.currentNavigation() || this.router.url !== url ||
+          this.adminSessionOwnerGeneration() !== owner || !this.requiresOriginalWorkspacePasswordFlow) return;
+
+      // Avoid retrying a failed starter load until the actor or navigation changes.
+      this.originalPasswordRedirectSource = { owner, url };
+      void this.router.navigate(["/operator-start"], {
+        queryParams: { ui: "original" },
+        replaceUrl: true,
+        info: this.originalPasswordRedirectInfo
+      }).catch(() => undefined);
+    });
+  });
   private readonly operatorHero = signal(this.resolveOperatorHero());
   private readonly synchronizeOperatorHero = effect(() => {
     const next = this.resolveOperatorHero();
@@ -150,6 +191,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   get isSignedOutOpsView(): boolean {
     return this.activeRouteView === "ops" && !this.app.hasAdminSession;
+  }
+
+  get requiresOriginalWorkspacePasswordFlow(): boolean {
+    return this.interfaceMode.mode() === "original" && this.app.requiresWorkspacePasswordChange;
   }
 
   get isOriginalAdminLogin(): boolean {

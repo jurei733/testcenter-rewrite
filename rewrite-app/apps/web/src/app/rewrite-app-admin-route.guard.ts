@@ -1,11 +1,12 @@
 import { Injector, inject, runInInjectionContext } from "@angular/core";
-import { RedirectCommand, Router, type CanActivateFn, type UrlTree } from "@angular/router";
+import { RedirectCommand, Router, type CanActivateChildFn, type CanActivateFn, type UrlTree } from "@angular/router";
 import { resolveOperatorAccessMode } from "@testcenter-rewrite-app/contracts";
 import { firstValueFrom, isObservable } from "rxjs";
 
+import { InterfaceModeService } from "./interface-mode.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { legacyBookmarkQueryKey, OriginalStarterSessionRejection, originalStarterRole } from "./native-participant/original-participant-bookmark";
+import { isExplicitOriginalAdminLogin, legacyBookmarkQueryKey, OriginalStarterSessionRejection, originalStarterRole } from "./native-participant/original-participant-bookmark";
 
 const redirectSignedOutOperator = async (
   requestedUrl: string
@@ -73,6 +74,31 @@ export const rejectSystemCheckOperator: CanActivateFn = () => {
   return operatorAccess.isSystemCheckOnly
     ? inject(Router).createUrlTree(["/system-check"])
     : true;
+};
+
+export function redirectToOriginalPasswordStarter(router: Router, interfaceMode: InterfaceModeService): RedirectCommand {
+  // An in-document URL change alone does not update InterfaceModeService.
+  if (interfaceMode.mode() !== "original") interfaceMode.select("original");
+  return new RedirectCommand(router.createUrlTree(["/operator-start"], {
+    queryParams: { ui: "original" }
+  }), { replaceUrl: true });
+}
+
+export const requireOriginalPasswordStarter: CanActivateChildFn = (route, state) => {
+  if (!inject(RewriteAppOperatorAccessService).requiresWorkspacePasswordChange) return true;
+
+  const path = state.url.split(/[?#]/, 1)[0];
+  const explicitLogin = isExplicitOriginalAdminLogin(state.url);
+  const nativeAdminRoute = explicitLogin || /^\/(?:admin\/[^/]+|superadmin|operator-start)(?:\/|$)/.test(path);
+  const mode = inject(InterfaceModeService);
+  if (!nativeAdminRoute && route.queryParamMap.get("ui") !== "original" && mode.mode() !== "original") return true;
+  if (path === "/operator-start" || explicitLogin) {
+    if (mode.mode() !== "original") mode.select("original");
+    return true;
+  }
+  // A forced Original actor always changes credentials through the native
+  // starter, including when entering a workspace from a bookmark.
+  return redirectToOriginalPasswordStarter(inject(Router), mode);
 };
 
 export const requireOriginalWorkspaceSession: CanActivateFn = (_route, state) =>

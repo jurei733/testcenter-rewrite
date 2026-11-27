@@ -8,6 +8,7 @@
   .original-native-account-menu,
   .original-administration-settings-overlay,
   .original-administration-editor-dialog,
+  .original-required-password-dialog,
   .original-participant-logout-dialog,
   .original-system-check-save-report-dialog,
   .original-system-check-saved-dialog,
@@ -66,6 +67,7 @@
 :root[data-interface-mode='original'] .original-system-check-save-report-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-password-confirmation-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-administration-editor-dialog button.mat-mdc-button-base:hover,
+:root[data-interface-mode='original'] .original-required-password-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-native-monitor-time-dialog button.mat-mdc-button-base:hover,
 :root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog button.mat-mdc-button-base:hover,
@@ -79,6 +81,7 @@
 // these tokens; the native Rewrite confirmation renderer stays untouched.
 :root[data-interface-mode='original'] .original-participant-logout-dialog,
 :root[data-interface-mode='original'] .original-administration-editor-dialog,
+:root[data-interface-mode='original'] .original-required-password-dialog,
 :root[data-interface-mode='original'] .original-native-monitor-filter-dialog,
 :root[data-interface-mode='original'] .original-native-monitor-time-dialog,
 :root[data-interface-mode='original'] .original-native-monitor-confirmation-dialog,

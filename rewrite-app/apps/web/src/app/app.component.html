@@ -34,7 +34,20 @@
       <span>The application shell is available, but signing in, loading test content, and saving require a connection.</span>
     </section>
   }
-  @if (app.requiresAdminPasswordChange || ownAdminPasswordDialogOpen) {
+  @if (requiresOriginalWorkspacePasswordFlow && isOriginalOperatorStarter) {
+    @defer (when true) {
+      @for (owner of [adminSessionOwnerGeneration()]; track owner) {
+        <app-original-required-password-flow />
+      }
+    } @error {
+      <section class="required-password-backdrop" role="alertdialog" aria-modal="true" aria-label="Kennwortformular nicht verfügbar">
+        <article class="required-password-card">
+          <p>Das Kennwortformular konnte nicht geladen werden.</p>
+          <button type="button" (click)="signOutRequiredAdmin()">Abmelden</button>
+        </article>
+      </section>
+    }
+  } @else if (!requiresOriginalWorkspacePasswordFlow && (app.requiresAdminPasswordChange || ownAdminPasswordDialogOpen)) {
     @defer (when true) {
       <app-admin-password-dialogs [host]="this" />
     } @placeholder {

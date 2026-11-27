@@ -1264,7 +1264,7 @@ export class OpsViewComponent implements OnInit {
   readonly authenticateOriginal = async (): Promise<void> => {
     await this.view.signInFromOriginalInterface();
     if (
-      await this.continueToRequestedView() ||
+      (!this.view.requiresOriginalWorkspacePasswordChange && await this.continueToRequestedView()) ||
       !this.view.canUseAdminSession ||
       this.view.isMonitorOnlySession
     ) {

@@ -99,6 +99,10 @@ export class AppShellFacade {
     return this.operatorAccess.requiresPasswordChange;
   }
 
+  get requiresWorkspacePasswordChange(): boolean {
+    return this.operatorAccess.requiresWorkspacePasswordChange;
+  }
+
   get hasAdminSession(): boolean {
     return this.uiState.adminSessionActive();
   }

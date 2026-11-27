@@ -18,6 +18,9 @@ import {
 export class RewriteAppUiStateService {
   readonly renderVersion = signal(0);
   readonly adminSessionActive = signal(false);
+  private readonly adminSessionGeneration = signal(0);
+  readonly adminSessionOwnerGeneration = this.adminSessionGeneration.asReadonly();
+  private adminSessionOwnerToken = "";
   private readonly originalAccountRightsVisible = signal(false);
   readonly showOriginalAccountRights = this.originalAccountRightsVisible.asReadonly();
   readonly responseMeta = signal("Idle");
@@ -40,6 +43,7 @@ export class RewriteAppUiStateService {
 
   setAdminSessionToken(value: string): void {
     this.ops.adminSessionToken = value;
+    this.updateAdminSessionOwner();
     const active = value.trim() !== "";
     this.adminSessionActive.set(active);
     if (!active) {
@@ -52,7 +56,15 @@ export class RewriteAppUiStateService {
   }
 
   syncAdminSessionToken(): void {
+    this.updateAdminSessionOwner();
     this.adminSessionActive.set(this.ops.adminSessionToken.trim() !== "");
     this.originalAccountRightsVisible.set(false);
+  }
+
+  private updateAdminSessionOwner(): void {
+    const token = this.ops.adminSessionToken;
+    if (token === this.adminSessionOwnerToken) return;
+    this.adminSessionOwnerToken = token;
+    this.adminSessionGeneration.update(generation => generation + 1);
   }
 }

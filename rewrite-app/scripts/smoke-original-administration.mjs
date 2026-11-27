@@ -228,24 +228,37 @@ try{
   const signedIn=guestPage.waitForResponse(response=>new URL(response.url()).pathname==="/api/v1/admin/auth/sign-in"&&response.ok());
   await guestPage.locator("#adminSignInButton").click();const guestToken=(await(await signedIn).json()).sessionToken;
   await guestPage.waitForURL(url=>url.pathname==='/app/operator-start');
-  await guestPage.locator("#requiredAdminPasswordChangeDialog").waitFor();
+  const requiredNotice=guestPage.getByRole("dialog").filter({hasText:"Ihr Kennwort wurde vom Administrator zurückgesetzt"});
+  await requiredNotice.waitFor();
+  await guestPage.waitForFunction(()=>document.activeElement?.tagName==="MAT-DIALOG-CONTAINER");
   assert.equal(await guestPage.locator('[data-cy^="workspace-card-"]').count(),0);
   const lockedChoices=await fetch(base+"/api/v1/admin/auth/current-session?view=original-workspace-starter",{
     headers:{authorization:`Bearer ${guestToken}`}
   });
   assert.equal(lockedChoices.status,200);
   assert.deepEqual((await lockedChoices.json()).originalWorkspaceChoices,[]);
-  await guestPage.locator("#requiredAdminPassword").fill("Own-original-password-9!");
-  await guestPage.locator("#requiredAdminPasswordConfirmation").fill("Own-original-password-9!");
-  await guestPage.locator("#requiredAdminPasswordSubmitButton").click();
-  await guestPage.locator("#adminSignInButton").waitFor();
+  await requiredNotice.locator('[data-cy="dialog-confirm"]').click();
+  const currentPassword=guestPage.locator('[data-cy="newPasswordForm-used-pw"]');
+  await guestPage.waitForFunction(()=>document.activeElement?.getAttribute("data-cy")==="newPasswordForm-used-pw");
+  await currentPassword.fill("Reset-original-password-9!");
+  await guestPage.locator('[data-cy="newPasswordForm-new-pw"]').fill("Own-original-password-9!");
+  await guestPage.locator('[data-cy="newPasswordForm-confirm-pw"]').fill("Own-original-password-9!");
+  const change=guestPage.waitForResponse(response=>response.request().method()==="PATCH"&&
+    new URL(response.url()).pathname==="/user/"+adminNativeId+"/password");
+  await guestPage.locator('[data-cy="newPasswordForm-submit"]').click();
+  assert.equal((await change).status(),200);
+  await guestPage.getByText("Kennwort erfolgreich geändert. Sie werden abgemeldet.",{exact:true}).waitFor();
+  const logout=guestPage.waitForResponse(response=>response.request().method()==="DELETE"&&new URL(response.url()).pathname==="/session");
+  await guestPage.locator("app-original-required-password-flow").getByRole("button",{name:"Schließen",exact:true}).click();
+  assert.equal((await logout).status(),205);
+  await guestPage.waitForURL(url=>url.pathname==="/app/native-start/login");
   assert.equal((await fetch(base+"/api/v1/admin/auth/current-session",{headers:{authorization:`Bearer ${guestToken}`}})).status,401);
   await guest.close();await page.bringToFront();
   console.log("original_administration=reset-real-login-lazy-required-password-change-revokes-session:passed");
   await resetInOriginal("Reset-original-again-9!");
   const assets=await readdir(resolve(frontendRoot,"dist/apps/web/browser"));const passwordChunks=[];
   for(const name of assets.filter(name=>name.endsWith('.js'))){
-    if(/selectors:\s*\[\s*\[\s*"app-admin-password-dialogs"/.test(await readFile(resolve(frontendRoot,"dist/apps/web/browser",name),"utf8")))passwordChunks.push(name);
+    if(/selectors:\s*\[\s*\[\s*"app-original-required-password-flow"/.test(await readFile(resolve(frontendRoot,"dist/apps/web/browser",name),"utf8")))passwordChunks.push(name);
   }
   assert.equal(passwordChunks.length,1,"The actual lazy password renderer must be unambiguous.");
   const failedGuest=await browser.newContext({serviceWorkers:"block"});
@@ -255,10 +268,10 @@ try{
   await failedPage.locator("#adminUsername").fill("owned-admin-a");await failedPage.locator("#adminPassword").fill("Reset-original-again-9!");
   const failedLogin=failedPage.waitForResponse(response=>new URL(response.url()).pathname==="/api/v1/admin/auth/sign-in"&&response.ok());
   await failedPage.locator("#adminSignInButton").click();const failedToken=(await(await failedLogin).json()).sessionToken;
-  const fallback=failedPage.getByRole("alertdialog",{name:"Password form unavailable"});await fallback.waitFor();
+  const fallback=failedPage.getByRole("alertdialog",{name:"Kennwortformular nicht verfügbar"});await fallback.waitFor();
   const denied=await fetch(base+"/api/v1/admin/users",{headers:{authorization:`Bearer ${failedToken}`}});
   assert.equal(denied.status,403);assert.equal((await denied.json()).error,"admin_password_change_required");
-  await fallback.getByRole("button",{name:"Close",exact:true}).click();
+  await fallback.getByRole("button",{name:"Abmelden",exact:true}).click();
   await fallback.waitFor({state:"detached"});
   assert.equal((await fetch(base+"/api/v1/admin/auth/current-session",{headers:{authorization:`Bearer ${failedToken}`}})).status,401);
   await failedGuest.close();await page.bringToFront();

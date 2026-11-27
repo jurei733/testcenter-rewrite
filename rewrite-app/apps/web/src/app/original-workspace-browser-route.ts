@@ -1,7 +1,10 @@
 import { Injector, inject } from "@angular/core";
-import type { ResolveFn, UrlMatcher } from "@angular/router";
+import { Router, type ResolveFn, type UrlMatcher } from "@angular/router";
 import type { OriginalOperatorWorkspaceChoice } from "@testcenter-rewrite-app/contracts";
 
+import { InterfaceModeService } from "./interface-mode.service";
+import { redirectToOriginalPasswordStarter } from "./rewrite-app-admin-route.guard";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
 export type OriginalNumericWorkspaceRoute =
@@ -22,6 +25,9 @@ export const matchOriginalNumericWorkspace: UrlMatcher = segments => {
 
 export const resolveOriginalNumericWorkspace: ResolveFn<OriginalNumericWorkspaceRoute> = async route => {
   const state = inject(RewriteAppUiStateService);
+  const operatorAccess = inject(RewriteAppOperatorAccessService);
+  const router = inject(Router);
+  const mode = inject(InterfaceModeService);
   const injector = inject(Injector);
   const token = state.ops.adminSessionToken;
   const workspaceNumber = route.paramMap.get("workspaceNumber");
@@ -34,8 +40,12 @@ export const resolveOriginalNumericWorkspace: ResolveFn<OriginalNumericWorkspace
       publishOriginalRights: true,
       includeOriginalWorkspaceChoices: true
     });
-    const workspace = session?.originalWorkspaceChoices?.find(choice => choice.workspaceNumber === workspaceNumber);
-    if (!workspace || token !== state.ops.adminSessionToken || (workspace.mode !== "RO" && workspace.mode !== "RW")) {
+    if (!session || token !== state.ops.adminSessionToken) return { kind: "denied" };
+    if (operatorAccess.requiresWorkspacePasswordChange) {
+      return redirectToOriginalPasswordStarter(router, mode);
+    }
+    const workspace = session.originalWorkspaceChoices?.find(choice => choice.workspaceNumber === workspaceNumber);
+    if (!workspace || (workspace.mode !== "RO" && workspace.mode !== "RW")) {
       return { kind: "denied" };
     }
     return { kind: "workspace", token, workspace: { ...workspace, mode: workspace.mode } };

@@ -503,6 +503,10 @@ export class OpsViewFacade {
     return this.ops.adminSessionToken.trim() !== "";
   }
 
+  get requiresOriginalWorkspacePasswordChange(): boolean {
+    return this.operatorAccess.requiresWorkspacePasswordChange;
+  }
+
   get canCreateAdminUser(): boolean {
     return (
       this.canUseAdminManagement &&

@@ -7,6 +7,7 @@ import {
   requireAdministrativeOperator,
   requireOriginalWorkspaceSession,
   requireOriginalNumericWorkspaceActor,
+  requireOriginalPasswordStarter,
   requireOriginalStarterRejection,
   resolveLegacyStarterBookmark,
   resolveLegacySuperadminBookmark
@@ -131,7 +132,8 @@ const canonicalRoutes: Routes = [
     path: "ops",
     loadComponent: () =>
       import("./ops-view.component").then(module => module.OpsViewComponent),
-    canActivate: [rejectSystemCheckOperator]
+    canActivate: [rejectSystemCheckOperator],
+    runGuardsAndResolvers: "paramsOrQueryParamsChange"
   },
   { path: "**", redirectTo: "home" }
 ];
@@ -174,5 +176,5 @@ export const appRoutes: Routes = [
     const {AppShellFacade}=await import('./app-shell.facade');
     injector.get(AppShellFacade).init();
     return true;
-  }],loadComponent:()=>import("./app.component").then(module=>module.AppComponent),children:canonicalRoutes}
+  }],canActivateChild:[requireOriginalPasswordStarter],loadComponent:()=>import("./app.component").then(module=>module.AppComponent),children:canonicalRoutes}
 ];

@@ -20,8 +20,14 @@ export function parseOriginalAdministrationWire(path:string,text:string):unknown
     return originalAdministrationId(context?.source??(Number.isSafeInteger(v)?String(v):''));
   });
   if(path==='/session'){
-    if(!object(value)||!numericIds.has(value)||typeof value['id']!=='string'||typeof value['token']!=='string'||!object(value['claims'])||
-      !Array.isArray(value['claims']['superAdmin'])||!Array.isArray(value['claims']['workspaceAdmin']))throw Error('Keine gültige Superadmin-Sitzung.');
+    if (!object(value) || !numericIds.has(value) || typeof value['id'] !== 'string' || typeof value['token'] !== 'string') {
+      throw Error('Keine gültige native Verwaltungssitzung.');
+    }
+    const claims = value['claims'];
+    if (!object(claims) || !Array.isArray(claims['workspaceAdmin']) ||
+        ('superAdmin' in claims && !Array.isArray(claims['superAdmin']))) {
+      throw Error('Keine gültige native Verwaltungssitzung.');
+    }
     return value as OriginalAdminAccessSet;
   }
   if(!Array.isArray(value))throw Error('Ungültiges natives Verwaltungsverzeichnis.');

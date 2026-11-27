@@ -60,6 +60,12 @@ export class OriginalOperatorStarterComponent implements AfterViewInit, OnDestro
       }
       if (this.identity?.token === token && this.identity.passwordChangeRequired === passwordChangeRequired) return;
       this.identity = { token, passwordChangeRequired };
+      if (passwordChangeRequired) {
+        this.choices.set([]);
+        this.failed.set(false);
+        this.loading.set(false);
+        return;
+      }
       untracked(() => void this.loadChoices());
     });
   }

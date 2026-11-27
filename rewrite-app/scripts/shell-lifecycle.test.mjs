@@ -158,3 +158,99 @@ for (const [action, expectedPath] of [
     assert.deepEqual(ops, {adminSessionToken: "replacement-session", adminSessionView: "Current account"});
   });
 }
+
+test("the native forced password dialog tracks the reactive owner number without rendering a credential", async () => {
+  const {parseTemplate, TmplAstIfBlock, TmplAstDeferredBlock, TmplAstForLoopBlock} = await import("@angular/compiler");
+  const template = readFileSync(new URL("../apps/web/src/app/app.component.html", import.meta.url), "utf8");
+  const {nodes, errors} = parseTemplate(template, "app.component.html");
+  assert.equal(errors, null);
+  const branch = nodes[0].children
+    .find(node => node instanceof TmplAstIfBlock && node.branches[0].expression.source.includes("requiresOriginalWorkspacePasswordFlow"))
+    .branches[0];
+  const body = branch.children.find(node => node instanceof TmplAstDeferredBlock);
+  const keyed = body.children.find(node => node instanceof TmplAstForLoopBlock);
+  assert.ok(keyed);
+  assert.equal(keyed.expression.source, "[adminSessionOwnerGeneration()]");
+  assert.equal(keyed.trackBy.source, keyed.item.name);
+  const [flow] = keyed.children;
+  assert.equal(flow.name, "app-original-required-password-flow");
+  assert.deepEqual(flow.attributes, []);
+  assert.deepEqual(flow.inputs, []);
+});
+
+test("admin owner generations publish token replacement and restored state without a route or activity change", async () => {
+  const {computed, signal} = await import("@angular/core");
+  const source = readFileSync(new URL("../apps/web/src/app/rewrite-app-ui-state.service.ts", import.meta.url), "utf8");
+  const {outputText} = ts.transpileModule(source, {
+    compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, experimentalDecorators: true}
+  });
+  const exports = {};
+  const empty = () => ({});
+  const modules = {
+    "@angular/core": {Injectable: () => target => target, signal},
+    "./rewrite-app-shell.state": {
+      createInitialShellOpsState: () => ({adminSessionToken: ""}),
+      createInitialShellContentState: empty,
+      createInitialShellFeedbackState: empty,
+      createInitialShellRuntimeState: empty,
+      createInitialShellWorkspaceState: empty
+    }
+  };
+  new Function("exports", "require", outputText)(exports, name => modules[name] ?? {});
+  const state = new exports.RewriteAppUiStateService();
+  const viewKey = computed(() => [state.adminSessionOwnerGeneration()]);
+  assert.deepEqual(viewKey(), [0]);
+  state.setAdminSessionToken("fixture-old");
+  assert.deepEqual(viewKey(), [1]);
+  state.setAdminSessionToken("fixture-new");
+  const replacement = viewKey();
+  assert.deepEqual(replacement, [2]);
+  assert.equal(state.adminSessionActive(), true);
+  state.setAdminSessionToken("fixture-new");
+  assert.equal(viewKey(), replacement);
+  state.ops.adminSessionToken = "fixture-restored";
+  state.syncAdminSessionToken();
+  assert.deepEqual(viewKey(), [3]);
+  state.setAdminSessionToken("");
+  assert.deepEqual(viewKey(), [4]);
+  assert.equal(state.renderVersion(), 0);
+});
+
+test("retiring the native forced password dialog clears the old form before closing and revokes only its own renewal", () => {
+  const source = readFileSync(new URL("../apps/web/src/app/original-required-password-flow.component.ts", import.meta.url), "utf8");
+  const {outputText} = ts.transpileModule(source, {
+    compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, experimentalDecorators: true}
+  });
+  const ops = {adminSessionToken: "fixture-old"};
+  let generation = 1;
+  const effects = [];
+  const exports = {};
+  const modules = {
+    "@angular/core": {Component: () => target => target, inject: value => value},
+    "./app-shell.facade": {AppShellFacade: {operatorAccountUsername: "Synthetic actor"}},
+    "./rewrite-app-ui-state.service": {RewriteAppUiStateService: {ops, adminSessionOwnerGeneration: () => generation}},
+    "./original-administration-http": {
+      createOriginalAdministrationTransport: () => async (method, path, body, token) => {
+        effects.push([method, path, body, token]);
+      }
+    }
+  };
+  new Function("exports", "require", outputText)(exports, name => modules[name] ?? {});
+  const flow = new exports.OriginalRequiredPasswordFlowComponent();
+  assert.equal(flow.current, true);
+  // Even if an earlier token is restored before the next render, its previous
+  // generation cannot run a dialog callback while Angular schedules teardown.
+  generation += 2;
+  assert.equal(flow.current, false);
+  const previousDialog = Object.create(exports.OriginalRequiredPasswordDialogComponent.prototype);
+  previousDialog.form = {reset: () => effects.push("Cleared form")};
+  flow.dialog = {componentInstance: previousDialog, close: () => effects.push("Closed dialog")};
+  flow.renewedToken = "fixture-retired-renewal";
+  ops.adminSessionToken = "fixture-replacement";
+  flow.ngOnDestroy();
+  assert.equal(flow.owner.signal.aborted, true);
+  assert.equal(ops.adminSessionToken, "fixture-replacement");
+  assert.deepEqual(effects, [
+    "Cleared form", "Closed dialog", ["DELETE", "/session", undefined, "fixture-retired-renewal"]
+  ]);
+});
