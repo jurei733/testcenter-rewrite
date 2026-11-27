@@ -197,7 +197,13 @@ export class NativeParticipantEntryComponent {
  get codeInputType():CodeInputType{const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.type??'text-field':'text-field';}
  get codeLength(){const s=this.session.access()?.viewSettings;return s&&!Array.isArray(s)?s.codeInput?.length:undefined;}
  async submit(){if(this.session.busy()||this.startingTest()||this.name.trim().length<3)return;this.problem.set('');const passwordStep=this.passwordStep();if(passwordStep)this.clearLoginWarning();else this.loginProblemCode.set(0);try{
-  const access=await this.session.loginParticipant(this.name.trim(),passwordStep?this.password:'',this.view.signal);if(this.view.signal.aborted||this.session.access()!==access)return;this.bindTexts(access.customTexts);this.password='';this.passwordStep.set(false);
+  const access=await this.session.loginParticipant(this.name.trim(),passwordStep?this.password:'',this.view.signal);
+  if(this.view.signal.aborted||this.session.access()!==access)return;
+  this.bindTexts(access.customTexts);
+  this.name='';
+  this.password='';
+  this.showPassword=false;
+  this.passwordStep.set(false);
   await this.navigateAfterLogin(access);
  }catch(error){if(this.view.signal.aborted||(error instanceof Error&&error.name==='AbortError'))return;if(error instanceof NativeMonitorHttpError){
    this.loginProblemCode.set(error.status);
