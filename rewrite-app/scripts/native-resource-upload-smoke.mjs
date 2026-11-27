@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
+import {withWorkspaceZipFileInput} from './workspace-zip-fixture.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 
@@ -31,9 +32,9 @@ export async function runNativeResourceUploadSmoke({browser,base,out,fixture,mar
     };
     return{context,page,catalog,authorization};
   };
-  const upload=async(page,name,bytes,status)=>{
+  const upload=(page,name,bytes,status)=>withWorkspaceZipFileInput(out,name,bytes,async file=>{
     const result=page.waitForResponse(reply=>new URL(reply.url()).pathname===path&&reply.request().method()==='POST');
-    await page.locator('[data-cy=upload-file-select]').setInputFiles({name,mimeType:'application/zip',buffer:bytes});
+    await page.locator('[data-cy=upload-file-select]').setInputFiles(file);
     const reply=await result;
     // The successful response echoes >44MB of source data. Chromium may evict
     // its inspector copy while Angular still consumes it normally. Observe
@@ -44,7 +45,7 @@ export async function runNativeResourceUploadSmoke({browser,base,out,fixture,mar
     wire.push({method:'POST',path,status:reply.status(),name,wireBytes:Buffer.byteLength(raw),payloadSha256:hash(raw),sourceDocumentSha256:hash(packet.sourceDocument)});
     await page.locator('#originalWorkspaceFiles[aria-busy=false]').waitFor();await page.locator('[data-cy=close-upload-report]').waitFor();
     return{body,packet};
-  };
+  });
   const download=async(page,suffix)=>{
     const row=page.locator('mat-row').filter({has:page.getByText('GeoGebra.itcr.zip',{exact:true})});await row.waitFor();
     const pending=page.waitForEvent('download');await row.locator('button').click();const file=await pending;

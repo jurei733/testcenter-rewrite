@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {readFile, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {workspaceZip} from './workspace-zip-fixture.mjs';
+import {withWorkspaceZipFileInput, workspaceZip} from './workspace-zip-fixture.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 
@@ -37,12 +37,7 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
   const upload = async (page,name,bytes,status) => {
     const started=Date.now();
     const large = bytes.length>10*1024*1024;
-    // Local Chrome on macOS can select the ZIP directly without transferring
-    // its base64 payload over DevTools. Chrome still runs the real FileReader.
-    const directory = large && process.platform==='darwin' ? await mkdtemp(join(out,'owned-native-zip-input-')) : undefined;
-    try {
-      const file = directory ? join(directory,name) : {name,mimeType:'application/zip',buffer:bytes};
-      if (directory) await writeFile(file,bytes,{mode:0o600});
+    return withWorkspaceZipFileInput(out, name, bytes, async file => {
       const [reply] = await Promise.all([
         page.waitForResponse(reply => new URL(reply.url()).pathname===path && reply.request().method()==='POST',{timeout:90_000}),
         page.locator('[data-cy=upload-file-select]').setInputFiles(file),
@@ -56,9 +51,7 @@ export async function runNativeWorkspaceZipSmoke({browser, base, out, fixture, m
       wire.push({name,status,elapsedMs:Date.now()-started,archiveBytes:bytes.length,archiveSha256:hash(bytes),wireBytes:Buffer.byteLength(raw)});
       await page.locator('#originalWorkspaceFiles[aria-busy=false]').waitFor(); await page.locator('[data-cy=close-upload-report]').waitFor();
       return body;
-    } finally {
-      if (directory) await rm(directory,{recursive:true,force:true});
-    }
+    });
   };
   try {
     const writer = await open(fixture.resourceUpload.writer); page = writer.page;

@@ -1,4 +1,21 @@
+import {mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {join} from 'node:path';
 import {crc32, deflateRawSync} from 'node:zlib';
+
+/** Local Chrome can select large ZIPs without a second base64 transfer over DevTools. */
+export async function withWorkspaceZipFileInput(out, name, bytes, useFile) {
+  if (process.platform !== 'darwin' || bytes.length <= 10 * 1024 * 1024) {
+    return useFile({name, mimeType: 'application/zip', buffer: bytes});
+  }
+  const directory = await mkdtemp(join(out, 'owned-native-zip-input-'));
+  try {
+    const file = join(directory, name);
+    await writeFile(file, bytes, {mode: 0o600});
+    return await useFile(file);
+  } finally {
+    await rm(directory, {recursive: true, force: true});
+  }
+}
 
 /** Independent ZIP writer for HTTP/browser and malformed-container probes. */
 export function workspaceZip(entries, {deflate = false, zip64 = false} = {}) {

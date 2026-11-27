@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
+import {FirstSliceError} from '@testcenter-rewrite-app/application';
+import {handleOriginalWorkspaceHttp} from '../apps/api/dist/apps/api/src/original-workspace-http.js';
 import {encodeOriginalReportJson, formatOriginalResponseReport, formatOriginalLogReport,
   formatOriginalReviewReport, formatOriginalReviewTimestamp}
   from '../packages/application/dist/packages/application/src/original-workspace-report-wire.js';
@@ -212,4 +214,50 @@ test('portable Original collation matches actual libc SQL order, including ignor
  assert.equal(source.version,'2.41');assert.equal(source.provider,'libc');assert.equal(source.productionVerification.scalars.count,1112063);assert.equal(source.productionVerification.scalars.allExact,true);assert.equal(source.productionVerification.compounds.count,977895);assert.equal(source.productionVerification.compounds.allExact,true);
  assert.deepEqual([...source.input].reverse().sort(compare),source.output);
  for(let left=0;left<source.output.length;left++)for(let right=left+1;right<source.output.length;right++)assert.ok(compare(source.output[left],source.output[right])<=0);
+});
+
+test('native reports require the same current workspace grant after rendering', async t => {
+  const scope = {tenantId:'tenant',workspaceId:'workspace',tenantKey:'fixture',workspaceKey:'results'};
+  const content = {'text/csv':'synthetic CSV','application/json':'["synthetic JSON"]'};
+  for (const type of ['response','log','review']) {
+    for (const accept of Object.keys(content)) {
+      await t.test(type + ' ' + accept, async () => {
+        for (const revoke of [true,false]) {
+          let hasAccess = true;
+          const replies = [];
+          const request = {token:'fixture-reader',workspacePathSegment:'1',write:false};
+          const handled = await handleOriginalWorkspaceHttp({
+            request:{method:'GET',headers:{authtoken:request.token,accept}},
+            pathname:'/workspace/1/report/'+type,
+            searchParams:new URLSearchParams({dataIds:'fixture-group'}),
+            services:{
+              originalWorkspaceAdministration:{
+                async resolve(access) {
+                  assert.deepEqual(access,request);
+                  if (!hasAccess) throw new FirstSliceError(404,'original_workspace_not_found','Workspace not found.');
+                  return scope;
+                }
+              },
+              originalWorkspaceReport:{
+                async read(report) {
+                  assert.equal(report.workspaceId,scope.workspaceId);
+                  assert.equal(report.dataIds,'fixture-group');
+                  assert.equal(report.type,type);
+                  if (revoke) hasAccess = false;
+                  return {body:content[accept],contentType:accept};
+                }
+              }
+            },
+            propagateError:()=>false,
+            header(){},
+            raw:(status,body,contentType)=>replies.push({status,body,contentType})
+          });
+          assert.equal(handled,true);
+          assert.deepEqual(replies,[revoke
+            ? {status:404, body:'Workspace not found.',contentType:'text/html;charset=UTF-8'}
+            : {status:200, body:content[accept],contentType:accept}]);
+        }
+      });
+    }
+  }
 });

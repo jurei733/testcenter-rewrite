@@ -204,6 +204,7 @@ export async function handleOriginalWorkspaceHttp(input:{request:IncomingMessage
         }
         if(type!=='response'&&type!=='log'&&type!=='review')throw new FirstSliceError(404,'original_report_type_missing',"Report type '"+type+"' not found.");
         const result=await input.services.originalWorkspaceReport.read({...scope,type,dataIds,accept,useNewVersion:originalReportQuery(params,'useNewVersion')==='true'});
+        await confirmScope();
         input.raw(200,result.body,result.contentType);return true;
       }
       if(operation==='results'){
