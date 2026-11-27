@@ -21,7 +21,7 @@ const angular={...core,Component:()=>value=>value,Injectable:()=>value=>value,Vi
 function load(relative){
  const file=resolve(root,relative);if(cache.has(file))return cache.get(file);
  const exports={};cache.set(file,exports);
- const source=process.env.NATIVE_MONITOR_SOURCE_REV?execFileSync('git',['show',process.env.NATIVE_MONITOR_SOURCE_REV+':rewrite-app/apps/web/src/app/native-monitor/'+relativePath(root,file)],{encoding:'utf8'}):readFileSync(file,'utf8');
+ const source=process.env.NATIVE_MONITOR_SOURCE_REV?execFileSync('git',['show',process.env.NATIVE_MONITOR_SOURCE_REV+':rewrite-app/apps/web/src/app/'+relativePath(dirname(root),file)],{encoding:'utf8'}):readFileSync(file,'utf8');
  const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,experimentalDecorators:true}}).outputText;
  new Function('exports','require',code)(exports,spec=>{
   if(spec==='@angular/core')return angular;
@@ -233,9 +233,11 @@ for(const transition of ['route','access','destroy','selection','targets'])test(
  else f.tsm.checked=[{...f.tsm.checked[0],data:{testId:'9007199254740994'}}];
  f.gotoDialog.next(7);assert.deepEqual(f.gotos,[]);if(transition!=='destroy')f.component.ngOnDestroy();
 });
-test('Goto sends only the originally confirmed rows and retains their exact numeric identities',()=>{
- const f=componentFixture();f.params.next({'group-name':'A'});const {row,selection}=selectGoto(f);const targets=f.tsm.checked;f.component.testCommandGoto();
- f.tsm.checked=[{...row}];f.gotoDialog.next(7);assert.equal(f.gotos.length,1);assert.equal(f.gotos[0].targets,targets);assert.equal(f.gotos[0].selection,selection);assert.equal(f.gotos[0].time,7);assert.equal(f.gotos[0].targets[0].data.testId,'9007199254740993');f.component.ngOnDestroy();
+test('Goto retains the confirmed numeric identities and uses their latest adaptive snapshot',()=>{
+ const f=componentFixture();f.params.next({'group-name':'A'});const {row,selection}=selectGoto(f);f.component.testCommandGoto();
+ f.tsm.checked=[{...row,bookletStates:{bonus:'no'}}];f.gotoDialog.next(7);
+ assert.equal(f.gotos.length,1);assert.equal(f.gotos[0].targets,f.tsm.checked);assert.equal(f.gotos[0].selection,selection);
+ assert.equal(f.gotos[0].time,7);assert.equal(f.gotos[0].targets[0].data.testId,'9007199254740993');f.component.ngOnDestroy();
 });
 test('a Booklet read survives repeated snapshots, but an unfinished replacement aborts and retries after disconnect',async t=>{
  clock(t);const {backend,session}=transport(),requests=[],snapshots=new rx.Subject();
@@ -286,6 +288,18 @@ test('the actual Goto producer uses captured targets and cannot start after its 
  const a=row('9007199254740993'),b=row('9007199254740994'),selection={element:block};
  f.manager._checked={other:b};f.manager.testCommandGoto(selection,7,[a]).subscribe();assert.deepEqual(f.writes[0],{type:'goto',args:['id','owned-target','| closed timeblock reopened - new remaining time 7'],ids:['9007199254740993']});
  f.writes.length=0;const pending=f.manager.testCommandGoto(selection,7,[a]);f.manager.connect('B');pending.subscribe();assert.deepEqual(f.writes,[]);f.manager.disconnect();
+});
+test('Goto reports the actual destinations and does not dispatch a hidden adaptive block',()=>{
+ const f=managerFixture(),responses=[];f.manager.connect('A');f.manager.commandResponses$.subscribe(value=>responses.push(value));
+ const block={id:'B1',blockId:'B1',restrictions:{show:{if:'bonus',is:'yes'}},children:[{id:'UNIT',alias:'owned-target',label:'Owned'}]};
+ const row=(id,bonus)=>({data:{testId:id,bookletName:'BOOK'},booklet:{species:'owned',states:{},units:{children:[block]}},bookletStates:{bonus}});
+ const visible=row('9007199254740993','yes'),hidden=row('9007199254740994','no');
+ const selection={element:block};
+ f.manager.testCommandGoto(selection,7,[visible,hidden]).subscribe();
+ assert.deepEqual(f.writes,[{type:'goto',args:['id','owned-target',''],ids:['9007199254740993']}]);
+ assert.deepEqual(responses,[{commandType:'goto',testIds:['9007199254740993']}]);
+ f.manager.testCommandGoto(selection,7,[hidden]).subscribe({next:()=>assert.fail('No destination was sent')});
+ assert.equal(f.writes.length,1);assert.deepEqual(responses[1],{commandType:'goto',testIds:[]});f.manager.disconnect();
 });
 for(const action of ['Pause','Resume','Unlock'])for(const transition of ['group','access'])test(action+' cannot outlive its '+transition+' context',()=>{
  const f=managerFixture(),pending=new rx.Subject();f.backend.command=()=>pending;f.backend.unlock=()=>pending;f.manager.connect('A');

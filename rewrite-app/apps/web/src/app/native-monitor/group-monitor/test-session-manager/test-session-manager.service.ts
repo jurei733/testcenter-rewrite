@@ -318,23 +318,30 @@ export class TestSessionManager {
   }
 
   testCommandGoto(selection: Selected, newTimeLeft: number, targets: TestSession[] = this.checked): Observable<true> {
-    const gfg = TestSessionManager.groupForGoto(targets, selection);
-    const allTestIds = targets.map(s => s.data.testId);
+    const destinations = Object.entries(TestSessionManager.groupForGoto(targets, selection));
     const group = this.groupName;
     const revision = this.connectionRevision;
     const scope = this.bs.accessSignal;
-    return defer(() => group && group === this.groupName && revision === this.connectionRevision &&
-      scope === this.bs.accessSignal && !scope.aborted ? zip(
-        Object.keys(gfg).map(unitAlias => this.bs.command(
-          'goto',
-          ['id', unitAlias, gfg[unitAlias].isClosed ? `| closed timeblock reopened - new remaining time ${newTimeLeft}` : ''],
-          gfg[unitAlias].ids))
-      ).pipe(
+    return defer(() => {
+      if (!group || group !== this.groupName || revision !== this.connectionRevision ||
+        scope !== this.bs.accessSignal || scope.aborted) return EMPTY;
+      if (!destinations.length) {
+        this._commandResponses$.next({commandType: 'goto', testIds: []});
+        return EMPTY;
+      }
+      return zip(destinations.map(([unitAlias, destination]) => this.bs.command(
+        'goto',
+        ['id', unitAlias, destination.isClosed ? `| closed timeblock reopened - new remaining time ${newTimeLeft}` : ''],
+        destination.ids
+      ))).pipe(
         takeUntil(this.disconnected$),
         takeUntil(fromEvent(scope, 'abort')),
-        tap(() => { this._commandResponses$.next({ commandType: 'goto', testIds: allTestIds }); }),
+        tap(responses => {
+          this._commandResponses$.next({commandType: 'goto', testIds: responses.flatMap(response => response.testIds)});
+        }),
         map(() => true as const)
-      ) : EMPTY);
+      );
+    });
   }
 
   testCommandUnlock(): void {

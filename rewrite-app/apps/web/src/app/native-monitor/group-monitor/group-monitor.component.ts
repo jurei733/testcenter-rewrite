@@ -364,7 +364,7 @@ export class GroupMonitorComponent implements OnInit, OnDestroy {
     ).pipe(
       take(1),
       filter((confirmed?: number | boolean) => !!confirmed && current()),
-      switchMap(confirmed => this.tsm.testCommandGoto(selection, Number(confirmed), targets)),
+      switchMap(confirmed => this.tsm.testCommandGoto(selection, Number(confirmed), this.tsm.checked)),
       takeUntil(this.routeChanged$),
       takeUntil(fromEvent(scope, 'abort'))
     ).subscribe({
