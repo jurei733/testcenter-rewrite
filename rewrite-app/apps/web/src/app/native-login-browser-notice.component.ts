@@ -1,6 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, effect, inject } from '@angular/core';
 import { MatCard, MatCardContent } from '@angular/material/card';
 
+import { ApplicationSettingsService } from './application-settings.service';
 import { BrowserCompatibilityService } from './browser-compatibility.service';
 import { NativeMonitorIconComponent as MatIcon } from './native-monitor/native-monitor-icon.component';
 
@@ -42,4 +43,9 @@ import { NativeMonitorIconComponent as MatIcon } from './native-monitor/native-m
 })
 export class NativeLoginBrowserNoticeComponent {
   readonly browser = inject(BrowserCompatibilityService);
+
+  constructor() {
+    const settings = inject(ApplicationSettingsService);
+    effect(() => this.browser.setCustomTexts(settings.settings().customTexts));
+  }
 }

@@ -62,9 +62,7 @@ header mat-toolbar.compact-heading {
 :host ::ng-deep button[mat-icon-button] { font-family:revert; font-weight:revert; }
 :host ::ng-deep .mat-mdc-slide-toggle .mdc-label { display:revert; gap:normal; font:inherit; color:inherit; }
 
-/* The pinned Original login layout. The shell supplies the real header/footer;
-   this flex child uses their remaining space, including narrow viewports. */
-/* Pinned AppRootComponent scroll outlet and LoginComponent host. */
+/* The shell supplies the header/footer and a scrollable login outlet. */
 .native-login-outlet { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .native-login-host { flex: 1; max-height: 100%; }
 .login-page { display: flex; height: 100%; flex-direction: row; gap: 64px; color: var(--mat-sys-on-surface); }
@@ -83,6 +81,110 @@ header mat-toolbar.compact-heading {
 .password-headline > button { color: var(--mat-sys-primary); border: 1px solid var(--mat-sys-primary); border-radius: 12px; }
 .button-section { align-self: end; display: flex; gap: 9px; margin-top: auto; padding-bottom: 12px; margin-right: 24px; }
 .button-section button { border: 1px solid var(--mat-sys-primary); }
+
+@media (width < 900px) {
+  :host:has(.login-page) {
+    height: 100dvh;
+  }
+
+  .native-login-host {
+    max-height: none;
+  }
+
+  .login-page {
+    --login-inline-padding: clamp(16px, 6vw, 36px);
+    height: auto;
+    min-height: 100%;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .login-section {
+    order: -1;
+    flex: 0 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 28px var(--login-inline-padding) 20px;
+    gap: 20px;
+  }
+
+  .login-section form {
+    max-width: 32rem;
+    width: 100%;
+    margin-top: 0;
+    gap: 16px;
+  }
+
+  .login-section h2 {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.25;
+  }
+
+  .password-headline {
+    gap: 12px;
+  }
+
+  .password-headline > button {
+    flex: none;
+  }
+
+  .button-section {
+    margin: 0;
+    padding-bottom: 0;
+  }
+
+  .welcome-section {
+    flex: 1 0 auto;
+    flex-direction: row;
+    align-items: flex-start;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 20px var(--login-inline-padding);
+    gap: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .welcome-section img {
+    flex: none;
+    width: 56px;
+  }
+
+  .welcome-section .heading {
+    margin-top: 0;
+    font-size: 20px;
+  }
+}
+
+@media (width < 390px) {
+  :host:has(.login-page) header mat-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    padding-inline: 12px;
+  }
+
+  :host:has(.login-page) header .center {
+    position: static;
+    transform: none;
+  }
+
+  :host:has(.login-page) header .logo {
+    min-width: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  :host:has(.login-page) header .logo a,
+  :host:has(.login-page) header .logo img {
+    display: block;
+    max-width: 100%;
+    object-fit: contain;
+  }
+}
+
 .monitor-selection { max-width: 850px; width: 100%; margin: 32px auto; }
 .monitor-claim { margin: 8px; min-height: 72px; }
 .monitor-claim strong, .monitor-claim span { display: block; }

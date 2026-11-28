@@ -1158,7 +1158,7 @@ test('complete native Monitor pixels are a required same-run Source and runtime 
  assert.ok(workflow.jobs.acceptance.needs.includes('native-monitor-visual'));
 });
 
-test('both native login roots require all ten exact Source states and retain immutable same-run evidence',()=>{
+test('both native login roots require exact desktop and verified narrow states and retain immutable same-run evidence',()=>{
  const job=workflow.jobs['native-login-visual'];
  assert.deepEqual(job.strategy.matrix.entry,['monitor','participant']);
  assert.deepEqual(job.strategy.matrix.scenario,['empty','name-filled','password','password-filled','password-visible','password-back','password-error','password-rate-limit','password-expired','password-scheduled','password-server-error']);
@@ -1173,7 +1173,7 @@ test('both native login roots require all ten exact Source states and retain imm
  assert.equal(download.id,'original-login-reference');assert.equal(download.with.name,'original-reference-${{ github.sha }}-${{ needs.original-reference-build.outputs.attempt }}');
  assert.equal(download.with['digest-mismatch'],'error');assert.equal(download.with['run-id'],undefined);assert.equal(download.with['github-token'],undefined);
  const controls=job.steps.find(step=>step.name==='Verify actual native paint and layout negative controls');assert.equal(controls.run,'xvfb-run --auto-servernum npm run test:browser-capture:built');
- const self=job.steps.find(step=>step.name==='Require exact Original login self-control'),pair=job.steps.find(step=>step.name==='Require eight exact complete Original-to-Rewrite login viewports');
+ const self=job.steps.find(step=>step.name==='Require exact Original login self-control'),pair=job.steps.find(step=>step.name==='Verify exact desktop and readable narrow login viewports');
  assert.equal(self.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs source-self-control');
  assert.equal(pair.run,'timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs rewrite');
  assert.ok(job.steps.indexOf(runtime)<job.steps.indexOf(controls));assert.ok(job.steps.indexOf(controls)<job.steps.indexOf(self));assert.ok(job.steps.indexOf(self)<job.steps.indexOf(pair));

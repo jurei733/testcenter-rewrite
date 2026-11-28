@@ -374,7 +374,7 @@ jobs:
           retention-days: 30
 
   native-login-visual:
-    name: Native login full-viewport Original parity (${{ matrix.entry }}/${{ matrix.scenario }})
+    name: Native login desktop fidelity and narrow layout (${{ matrix.entry }}/${{ matrix.scenario }})
     needs: [build, original-reference-build, browser-system-dependencies, fast-feedback]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -422,7 +422,7 @@ jobs:
           NATIVE_LOGIN_SCENE: ${{ matrix.scenario }}
           ORIGINAL_BROWSER_REFERENCE_ROOT: ${{ runner.temp }}/original-browser
         run: timeout --signal=TERM --kill-after=15s 5m xvfb-run --auto-servernum node scripts/smoke-native-login-visual.mjs source-self-control
-      - name: Require eight exact complete Original-to-Rewrite login viewports
+      - name: Verify exact desktop and readable narrow login viewports
         env:
           UI_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/native-login-visual
           NATIVE_LOGIN_ENTRY: ${{ matrix.entry }}

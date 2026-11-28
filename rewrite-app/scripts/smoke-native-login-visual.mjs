@@ -34,6 +34,36 @@ const {verifyOriginalBuild}=await import(pathToFileURL(join(app,'scripts/origina
 const {captureStableViewport}=await import(pathToFileURL(join(app,'scripts/stable-viewport-capture.mjs')));
 const {compareScreenshots}=await import(pathToFileURL(join(app,'scripts/exact-rgba-comparison.mjs')));
 const {readNativeSmokeResponse,stopNativeSmokeServer}=await import(pathToFileURL(join(app,'scripts/native-monitor-smoke-io.mjs')));
+
+const readNarrowLoginLayout = page => page.evaluate(() => {
+  const header = document.querySelector('[data-cy="header"]').getBoundingClientRect();
+  const footer = document.querySelector('footer').getBoundingClientRect();
+  const welcome = document.querySelector('.welcome-section');
+  const form = document.querySelector('.login-section form').getBoundingClientRect();
+  const input = document.querySelector('.login-section form input').getBoundingClientRect();
+  const welcomeRect = welcome.getBoundingClientRect();
+  const textBoxes = [...welcome.querySelectorAll('p')].flatMap(paragraph => {
+    const text = document.createRange();
+    text.selectNodeContents(paragraph);
+    return [...text.getClientRects()];
+  });
+  const outlet = document.querySelector('.native-login-outlet');
+  return {
+    headerBottom: header.bottom,
+    footerTop: footer.top,
+    viewportWidth: innerWidth,
+    stacked: getComputedStyle(document.querySelector('.login-page')).flexDirection === 'column',
+    formVisible: form.left >= 0 && form.right <= innerWidth && form.top >= header.bottom,
+    inputVisible: input.left >= 0 && input.right <= innerWidth &&
+      input.top >= header.bottom && input.bottom <= footer.top,
+    formBeforeWelcome: form.bottom <= welcomeRect.top + 1,
+    textLines: textBoxes.length,
+    clippedTextLines: textBoxes.filter(box => box.left < welcomeRect.left - .5 ||
+      box.right > welcomeRect.right + .5).length,
+    horizontalScroll: outlet ? outlet.scrollWidth > outlet.clientWidth : undefined
+  };
+});
+
 const manifest=await verifyOriginalBuild(root);
 // Opaque diagnostics are variable fixture data, like owned login names. Use one
 // genuinely observed Source Error-ID as server input on both rendered surfaces;
@@ -92,7 +122,9 @@ const settings=(await native('GET',productionApiRoutes.system.getApplicationSett
  await writeFile(join(out,'graphics-context.json'),JSON.stringify({defaultBrowserArguments:true,diagnosticOnly:process.env.GITHUB_ACTIONS!=='true',launchArgs:[],headful:true,gpu:system.gpu},null,2));
  if(process.env.GITHUB_ACTIONS==='true'){const bundle=JSON.parse(await readFile(join(process.env.RUNNER_TEMP,'browser-system/manifest.json'),'utf8'));const reference=monitorVisualRuntimeMaterial(bundle);assert.equal(browser.version(),reference.material.browserVersion);await writeFile(join(out,'runtime-reference.json'),JSON.stringify({bundleVersion:bundle.version,bundleContext:bundle.context,oracleContext:reference.context,materialSha256:reference.materialSha256},null,2));}
  const comparisons={};const now=Date.now();
+ const narrowLoginLayouts = {};
  for(const [screen,width,height]of [['desktop',1280,720],['mobile',390,844]]){
+  const verifyResponsiveLayout = screen === 'mobile' && !selfControl && loginState !== 'account';
   const captures={},animationSpecs={};
   for(const side of ['source','rewrite']){
    const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,locale:'de-DE',timezoneId:'Europe/Berlin',serviceWorkers:'block'}),page=await context.newPage();pages.push({page,side,screen});await page.bringToFront();
@@ -132,6 +164,7 @@ const settings=(await native('GET',productionApiRoutes.system.getApplicationSett
    if(loginState==='password-server-error'){await page.getByRole('dialog').waitFor();assert.ok((await page.locator('body').innerText()).includes(nativeErrorInput.errorId),'The actual HTTP Error-ID must be rendered by both real error dialogs');await page.keyboard.press('Escape');await page.mouse.click(2,2);assert.equal(await page.getByRole('dialog').count(),1);}
    await page.mouse.move(1,1);
    await page.waitForFunction(()=>document.getAnimations().every(a=>!Number.isFinite(a.effect?.getTiming().iterations)||a.playState==='finished'),{},{timeout:2000});
+   if (verifyResponsiveLayout) narrowLoginLayouts[side] = await readNarrowLoginLayout(page);
    await writeFile(join(out,screen+'-'+side+'-scene.json'),JSON.stringify({scene,authenticated:loginState==='account',entryState:await page.evaluate(()=>{const field=document.querySelector('.login-section form input'),eye=document.querySelector('.mat-mdc-form-field-icon-suffix button');return {focusedInput:document.activeElement===field,inputType:field?.type,inputValueLength:field?.value.length,autofocus:field?.hasAttribute('autofocus'),visibilityPressed:eye?.getAttribute('aria-pressed')??null};}),text:await page.locator('body').innerText()},null,2));
    const inspectLayout=()=>page.evaluate(()=>{
     const box=e=>{const b=e?.getBoundingClientRect();return b?{x:b.x,y:b.y,width:b.width,height:b.height}:null;};
@@ -180,8 +213,58 @@ const settings=(await native('GET',productionApiRoutes.system.getApplicationSett
    await context.close();
   }
  }
- assert.deepEqual(await sourceSnapshot(),sourceHashes,'No candidate source may change during visual capture');await verifyOriginalBuild(root);assert.equal(execFileSync('git',['-C',app,'status','--porcelain'],{encoding:'utf8'}).trim(),'','Candidate must remain clean');await writeFile(join(out,'login-observations.json'),JSON.stringify({errors,unknown,requests,comparisons,captureFailures,surfaces,sourceHashes,manifest,nativeErrorInput},null,2));assert.deepEqual(errors,[]);assert.deepEqual(unknown,[]);await writeFile(join(out,'result.json'),JSON.stringify({success:captureFailures.length===0,exactParity:captureFailures.length===0&&Object.values(comparisons).flatMap(Object.values).length===8&&Object.values(comparisons).flatMap(Object.values).every(v=>v.differingPixels===0),browser:browser.version(),scene,nativeErrorInput,diagnosticOnly:process.env.GITHUB_ACTIONS!=='true',nativeLinuxMeasurement:process.env.GITHUB_ACTIONS==='true',launchArgs:[],candidate:{head:process.env.GITHUB_SHA,sourceHashes,dirty:execFileSync('git',['-C',app,'status','--porcelain'],{encoding:'utf8'}).trim(),diffSha256:createHash('sha256').update(execFileSync('git',['-C',app,'diff','--binary'])).digest('hex')},manifest,surfaces,comparisons,captureFailures,errors,unknown,requests,comparisonKind:selfControl?'Original-vs-Original':'Original-vs-Rewrite',hasRewriteSurface:!selfControl,productionAdmission:false,scope:loginState==='account'?'Authenticated native Starter header and account menu. Unmodified Original frontend and Rewrite against one owned native backend. Real login, close, focus restoration, cancelled and confirmed logout. Eight full viewport captures without masking.':'Default headed browser; locked Chromium on actual native Linux in CI. Unmodified pinned Original frontend against an owned real native API and owned bootstrap config DTO. Owned real active rate-limit login scene; actual production limiter and correct-password lockout are retained. Ten other static name/password/visibility/back/rejected-password/expired/scheduled/server-error scenes on both native entry routes; the unexpected final server-error state retains credentials and the actual Source blocking error dialog, its visible diagnostic ID, details and trusted reload action; both surfaces receive the same declared genuinely Source-observed opaque diagnostic fixture input through the owned server dependency, while production IDs remain fresh; four repeated static captures per viewport, not authored gradient phases. Source backend and complete Original entry behavior are not qualified.'},null,2));console.log(JSON.stringify({comparisons,errors,unknown}));assert.equal(surfaces.length,4);if(!selfControl)for(const screen of ['desktop','mobile']){const a=surfaces.find(s=>s.screen===screen&&s.side==='source'),b=surfaces.find(s=>s.screen===screen&&s.side==='rewrite');assert.notEqual(a.origin,b.origin);assert.notEqual(a.documentSha256,b.documentSha256,'The rewrite must use its own real compiled document');}
- assert.deepEqual(captureFailures,[],'Every complete native frame must stabilize');assert.equal(Object.values(comparisons).flatMap(Object.values).length,8);assert.ok(Object.values(comparisons).flatMap(Object.values).every(value=>value.differingPixels===0),'All eight full native viewport comparisons must be exactly RGBA-identical');
+ assert.deepEqual(await sourceSnapshot(), sourceHashes, 'No candidate source may change during visual capture');
+ await verifyOriginalBuild(root);
+ const dirty=execFileSync('git',['-C',app,'status','--porcelain'],{encoding:'utf8'}).trim();
+ assert.equal(dirty, '', 'Candidate must remain clean');
+ await writeFile(join(out,'login-observations.json'), JSON.stringify({
+   errors, unknown, requests, comparisons, captureFailures, surfaces, sourceHashes, manifest, nativeErrorInput
+ },null,2));
+ assert.deepEqual(errors, []);
+ assert.deepEqual(unknown, []);
+ assert.equal(surfaces.length,4);
+ if(!selfControl) for(const screen of ['desktop','mobile']) {
+   const source=surfaces.find(surface=>surface.screen===screen&&surface.side==='source');
+   const rewrite=surfaces.find(surface=>surface.screen===screen&&surface.side==='rewrite');
+   assert.notEqual(source.origin,rewrite.origin);
+   assert.notEqual(source.documentSha256,rewrite.documentSha256,'The rewrite must use its own real compiled document');
+ }
+ assert.deepEqual(captureFailures, [], 'Every complete native frame must stabilize');
+ assert.equal(Object.values(comparisons.desktop).length, 4);
+ assert.equal(Object.values(comparisons.mobile).length, 4);
+ assert.ok(Object.values(comparisons.desktop).every(value => value.differingPixels === 0),
+   'All four desktop viewports must match exactly');
+ if (selfControl || loginState === 'account') {
+   assert.ok(Object.values(comparisons.mobile).every(value => value.differingPixels === 0),
+     'Original self-controls and authenticated mobile account viewports must match exactly');
+ } else {
+   await writeFile(join(out, 'narrow-login-layout.json'), JSON.stringify(narrowLoginLayouts, null, 2));
+   const {source, rewrite} = narrowLoginLayouts;
+   assert.ok(rewrite.stacked && rewrite.formVisible && rewrite.inputVisible && rewrite.formBeforeWelcome,
+     'The narrow login must keep the first credential field visible ahead of the welcome panel');
+   assert.ok(rewrite.textLines > 0 && rewrite.clippedTextLines === 0 && rewrite.horizontalScroll === false,
+     'The narrow welcome text must fit without horizontal clipping or scrolling');
+   assert.equal(rewrite.headerBottom, source.headerBottom, 'The header must keep its original position');
+   assert.equal(rewrite.footerTop, source.footerTop, 'The footer must keep its original position');
+   assert.ok(Object.values(comparisons.mobile).every(({bounds}) => !bounds ||
+     (bounds.top >= rewrite.headerBottom && bounds.bottom <= rewrite.footerTop)),
+     'The narrow layout may change only the region between the header and footer');
+ }
+ const frames=Object.values(comparisons).flatMap(Object.values);
+ await writeFile(join(out,'result.json'),JSON.stringify({
+   success:true,
+   exactParity:frames.every(frame=>frame.differingPixels===0),
+   mobileAcceptance:selfControl||loginState==='account'?'exact-viewport':'readable-stacked-login-with-exact-shell',
+   browser:browser.version(), scene, nativeErrorInput, launchArgs:[],
+   diagnosticOnly:process.env.GITHUB_ACTIONS!=='true', nativeLinuxMeasurement:process.env.GITHUB_ACTIONS==='true',
+   candidate:{head:process.env.GITHUB_SHA,sourceHashes,dirty,
+     diffSha256:createHash('sha256').update(execFileSync('git',['-C',app,'diff','--binary'])).digest('hex')},
+   manifest, surfaces, comparisons, captureFailures, errors, unknown, requests,
+   comparisonKind:selfControl?'Original-vs-Original':'Original-vs-Rewrite', hasRewriteSurface:!selfControl,
+   productionAdmission:false,
+   scope:'Four stable unmasked frames per viewport in the default headed browser. Both surfaces use the same owned native API. The rate-limit case uses real limiter responses. The server-error case uses one genuinely observed Source diagnostic ID as owned fixture input and verifies the active dialog and trusted recovery.'
+ },null,2));
+ console.log(JSON.stringify({comparisons,errors,unknown}));
 }catch(error){for(const {page,side,screen}of pages)if(!page.isClosed()){await page.screenshot({path:join(out,screen+'-'+side+'-failure.png')}).catch(()=>{});await writeFile(join(out,screen+'-'+side+'-failure.html'),await page.content().catch(()=>''));}await writeFile(join(out,'failure.json'),JSON.stringify({error:String(error),errors,unknown,requests},null,2));throw error;}
 finally{try{await browser?.close();}finally{if(sourceServer){sourceServer.closeAllConnections();await new Promise(done=>sourceServer.close(done));}if(server)await stopNativeSmokeServer(server);}}
 

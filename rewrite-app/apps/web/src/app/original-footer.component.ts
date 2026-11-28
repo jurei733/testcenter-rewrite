@@ -26,6 +26,29 @@ import { parseJsonDocument, readStringValue } from "./rewrite-app-shell.readers"
       font-family: 'Nunito Sans', sans-serif; font-size: 16px; }
     .all-buttons { display: flex; flex-direction: row; justify-content: space-around;
       align-items: center; }
+
+    @media (width < 390px) {
+      footer {
+        height: auto;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 12px 12px;
+      }
+
+      .version-label {
+        overflow-wrap: anywhere;
+      }
+
+      .all-buttons {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .all-buttons a {
+        min-width: 0;
+        padding-inline: 8px;
+      }
+    }
   `],
   styleUrl: "./original-login-theme.scss"
 })
