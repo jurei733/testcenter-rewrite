@@ -37,7 +37,11 @@ export class NativeLoginFailureService implements OnDestroy {
    if(!current())return;
    let mapped:AppError;
    if(error instanceof AppError)mapped=error;
-   else{
+   else if(context?.anonymous&&(error.status===401||error.status===403)){
+    const description='Bitte melden Sie sich erneut an, um den Gruppenmonitor zu öffnen.';
+    mapped=nativeRequestError(new HttpErrorResponse({status:error.status,error:description}));
+    mapped.details='HTTP '+error.status;
+   }else{
     let payload:unknown=error.message;try{payload=JSON.parse(error.message);}catch{}
     mapped=nativeRequestError(new HttpErrorResponse({status:error.status,error:payload,
      statusText:error.response?.statusText,url:error.response?.url,headers:new HttpHeaders({...error.response?.errorId?{'error-id':error.response.errorId}:{},...error.response?.testMode?{'test-mode':error.response.testMode}:{}})}));

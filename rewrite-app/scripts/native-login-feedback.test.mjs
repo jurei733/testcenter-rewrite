@@ -246,12 +246,19 @@ for(const status of [410,429])test('a group monitor session error '+status+' rel
  data.reload();
  assert.equal(f.clears,1);assert.equal(f.closes,1);assert.equal(f.location,'http://owned.invalid/app/native-start');
 });
-test('an already rejected monitor grant presents a public dialog without its private URL or login',async t=>{
+for(const [status,label] of [[401,'Bitte für diese Aktion erst anmelden!'],[403,'Sitzung nicht mehr gültig.']])test('a retired monitor grant with HTTP '+status+' presents only public diagnostics',async t=>{
  const f=dialogFixture(t);
  window.location.href='http://owned.invalid/app/group-monitor/private';
- await f.service.show(new HttpError(403),f.view.signal,undefined,{anonymous:true});
+ const error=new HttpError(status);
+ error.response={url:window.location.href,statusText:'Owned private status text',errorId:'owned-private-error-id',testMode:'RUN-DEMO'};
+ await f.service.show(error,f.view.signal,undefined,{anonymous:true,login:'Owned private login'});
  const {data}=f.opens[0].config;
- assert.equal(data.error.label,'Sitzung nicht mehr gültig.');
+ assert.equal(data.error.label,label);
+ assert.equal(data.error.description,'Bitte melden Sie sich erneut an, um den Gruppenmonitor zu öffnen.');
+ assert.equal(data.error.details,'HTTP '+status);
+ assert.equal(data.error.type,'session');
+ assert.equal(data.error.errorId,undefined);
+ assert.equal(data.error.testMode,null);
  assert.equal(data.url,'');assert.equal(data.login,undefined);
  data.reload();
  assert.equal(f.clears,0);assert.equal(f.location,'http://owned.invalid/app/native-start');
