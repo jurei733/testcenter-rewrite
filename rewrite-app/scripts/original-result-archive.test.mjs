@@ -157,6 +157,47 @@ for (const kind of kinds) test(`${kind}: Original archive distinguishes omitted 
         assert.deepEqual(steps, ['archive timestamp', 'verify current access']);
       }
     });
+    await t.test('canonical detail and CSV verify the exact workspace after reading response sources', async () => {
+      const expectedReads = ['listParticipantSessionsByWorkspace', 'listParticipantRosterEntriesByWorkspace',
+        'listTestRunsByWorkspace', 'listOriginalUnitsByWorkspace'];
+      const finishedReads = new Set();
+      const readRepository = new Proxy(repository, { get(target, key) {
+        const method = Reflect.get(target, key);
+        if (expectedReads.includes(key)) {
+          return async (...args) => {
+            const value = await method.apply(target, args);
+            finishedReads.add(key);
+            return value;
+          };
+        }
+        return typeof method === 'function' ? method.bind(target) : method;
+      } });
+      const { workspaceAdminRead: results } = createFirstSliceServices({ repository: readRepository, now: () => timestamp });
+      const denied = new Error('The current workspace grant is absent.');
+      for (const method of ['listDetailedResponses', 'exportResponseCsv']) {
+        for (const allowed of [true, false]) {
+          finishedReads.clear();
+          let verifications = 0;
+          const pending = results[method]({
+            ...scope, groupKey: 'alpha',
+            async verifyCurrentAccess(target) {
+              verifications++;
+              assert.deepEqual(finishedReads, new Set(expectedReads));
+              assert.deepEqual(target, { tenantId: workspace.tenantId, workspaceId: workspace.workspaceId });
+              if (!allowed) throw denied;
+            }
+          });
+          if (allowed) {
+            const result = await pending;
+            if (typeof result === 'string') assert.match(result, /Exact alpha Ω/);
+            else assert.deepEqual(result.map(row => row.response), ['Exact alpha Ω\n"; ']);
+          } else {
+            await assert.rejects(pending, error => error === denied);
+          }
+          assert.equal(verifications, 1);
+        }
+      }
+    });
     await t.test('unfiltered selection is workspace-scoped and survives durable reopen', async () => {
       const before = await report();
       if (kind !== 'memory') { await storage.shutdown(); await open(); }
@@ -328,11 +369,13 @@ test('protected HTTP exports retain unanswered Units for read-only users after c
    child.once('exit',()=>reject(Error('Owned result API exited before startup.')));
   }),20000,()=>{throw Error('Owned result API startup timed out.');});
   const base='http://127.0.0.1:'+port;let rootToken='';
-  const request=async(path,{method='GET',body,token=rootToken,status=200}={})=>{
+  const request=async(path,{method='GET',body,token=rootToken,status=200,cacheControl}={})=>{
    const response=await fetch(base+path,{method,headers:{...(token?{authorization:'Bearer '+token}:{}),
     ...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});
    const value=(response.headers.get('content-type')??'').includes('application/json')?await response.json():Buffer.from(await response.arrayBuffer());
-   assert.equal(response.status,status,method+' '+path+': '+(Buffer.isBuffer(value)?'binary':JSON.stringify(value)));return value;
+   assert.equal(response.status,status,method+' '+path+': '+(Buffer.isBuffer(value)?'binary':JSON.stringify(value)));
+   if (cacheControl !== undefined) assert.equal(response.headers.get('cache-control'), cacheControl);
+   return value;
   };
   rootToken=(await request('/api/v1/admin/auth/sign-in',{method:'POST',body:{username:'demo-admin',password:'demo-admin-password'}})).sessionToken;
   const scope='/api/v1/tenants/demo-tenant/workspaces/demo-workspace',archive=scope+'/exports/original-results.zip';
@@ -377,7 +420,24 @@ test('protected HTTP exports retain unanswered Units for read-only users after c
   assert.deepEqual(await check(),rows);
   assert.deepEqual(readArchive({body:await request(archive+'?groupKey=absent',{token:ro})}).rows.responses,[]);
   await request('/api/v1/tenants/demo-tenant/workspaces',{method:'POST',status:201,body:{workspaceKey:'owned-result-foreign',displayName:'Foreign'}});
-  await request('/api/v1/tenants/demo-tenant/workspaces/owned-result-foreign/exports/original-results.zip',{token:ro,status:403});
+  const foreignScope='/api/v1/tenants/demo-tenant/workspaces/owned-result-foreign';
+  await request(foreignScope+'/exports/original-results.zip',{token:ro,status:403});
+
+  const detailPath='/responses/detailed', csvPath='/exports/responses.csv';
+  const filters='?testRunId='+encodeURIComponent(runId)+'&unitKey=unit-intro&limit=1';
+  const privateRead={token:ro,cacheControl:'private, no-store'};
+  const detail=await request(scope+detailPath+filters,privateRead);
+  assert.equal(detail.items.length,1);
+  assert.equal(detail.items[0].response,before.unitResponses['unit-intro']);
+  assert.match((await request(scope+csvPath+filters,privateRead)).toString('utf8'), /"unit-intro","\{.*presentationProgress/);
+  for (const path of [detailPath,csvPath]) {
+   assert.equal((await request(scope+path,{token:'',status:401})).error,'admin_session_missing');
+   assert.equal((await request(foreignScope+path,{token:ro,status:403})).error,'admin_role_required');
+  }
+  await request('/api/v1/admin/auth/sign-out',{method:'POST',token:ro});
+  for (const path of [detailPath,csvPath]) {
+   assert.equal((await request(scope+path,{token:ro,status:401})).error,'admin_session_invalid');
+  }
  }finally{
   if(child.exitCode===null && child.signalCode===null)child.kill('SIGTERM');
   await raceWithSmokeDeadline(closed,10000,()=>{child.kill('SIGKILL');throw Error('Owned result API shutdown timed out.');});

@@ -53,6 +53,7 @@ export {decodeOriginalTestLogJson,encodeOriginalTestLogContent,parseOriginalTest
 export {prepareOriginalTestLock,lockOriginalTestCollection} from './original-test-lock.js';
 export {assertOriginalTestLogInput,prepareOriginalTestLogs,appendOriginalTestLogCollection,formatOriginalTestLogEntry} from './original-test-log.js';
 import {createOriginalUnitPort} from './original-unit.js';
+import {assertOriginalUnitParent, assertOriginalUnitRecord, originalUnitRecordKey} from './original-unit-record.js';
 import {type AttachmentFileChange, type OriginalAttachmentMutation} from './original-attachment-response.js';
 import {attachmentStorageId} from './attachment-storage-id.js';
 export {formatOriginalUnitReadJson} from './original-unit.js';
@@ -83,6 +84,7 @@ export {prepareOriginalPersonNumber,selectOriginalPersonNumber,validateOriginalP
 export type {OriginalPersonNumberScope,OriginalPersonNumberRecord} from './original-person-number.js';
 export {prepareOriginalTestNumber, assertOriginalTestCreationCandidate} from './original-test-number.js';
 export type {OriginalTestNumberRun, OriginalTestNumberScope, OriginalTestNumberRecord, OriginalTestNumberInput} from './original-test-number.js';
+import {resultParentUnavailable} from './result-artifact-parent.js';
 export {assertResultArtifactParent, guardResultArtifactCollections, activityResultParent, attachmentResultParent, resultParentUnavailable, type ResultArtifactParent} from './result-artifact-parent.js';
 export {prepareOriginalGroupDeletionInput, selectOriginalGroupDeletionKeys, deleteOriginalGroupsFromCollections, attachmentTestRunId} from './original-group-deletion.js';
 export type {OriginalGroupDeletionInput, OriginalGroupDeletionResult} from './original-group-deletion.js';
@@ -245,6 +247,7 @@ import {
   mergeVeronaSharedParameters,
   normalizeVeronaSharedParameters,
   parseVeronaUnitResponse,
+  serializeVeronaUnitResponse,
   projectVeronaPageState,
   readBookletConfigValues,
   readVeronaLegacyHtmlMetadata,
@@ -737,6 +740,7 @@ export type WorkspaceAdminReadPort = {
     unitKey?: string;
     status?: TestRun["status"];
     limit?: number;
+    verifyCurrentAccess?: (target: Pick<Workspace, "tenantId" | "workspaceId">) => Promise<void>;
   }): Promise<WorkspaceDetailedResponse[]>;
   listGroupResults(input: {
     tenantKey: string;
@@ -754,6 +758,7 @@ export type WorkspaceAdminReadPort = {
     unitKey?: string;
     status?: TestRun["status"];
     limit?: number;
+    verifyCurrentAccess?: (target: Pick<Workspace, "tenantId" | "workspaceId">) => Promise<void>;
   }): Promise<string>;
   exportOriginalResultArchive(input: {
     tenantKey: string;
@@ -7539,21 +7544,23 @@ const filterOpenMonitorRuns = (
     : filteredItems.slice(0, resolveOperatorReadLimit(input.limit));
 };
 
-const listDetailedResponsesForWorkspace = (input: {
-  tenantKey: string;
-  workspaceKey: string;
-  participantSessions: ParticipantSession[];
-  participantRosterEntries?: ParticipantRosterEntry[];
-  testRuns: TestRun[];
-} & DetailedResponseFilters): WorkspaceDetailedResponse[] => {
+const listDetailedResponsesForWorkspace = async (
+  repository: FirstSliceRepository,
+  workspace: Workspace,
+  input: DetailedResponseFilters & { tenantKey: string; workspaceKey: string }
+): Promise<WorkspaceDetailedResponse[]> => {
+  const { tenantId, workspaceId } = workspace;
+  const { tenantKey, workspaceKey } = input;
+  const [participantSessions, participantRosterEntries, testRuns] = await Promise.all([
+    repository.listParticipantSessionsByWorkspace(tenantId, workspaceId),
+    repository.listParticipantRosterEntriesByWorkspace(tenantId, workspaceId),
+    repository.listTestRunsByWorkspace(tenantId, workspaceId)
+  ]);
   const participantSessionsById = new Map(
-    input.participantSessions.map(participantSession => [
-      participantSession.participantSessionId,
-      participantSession
-    ])
+    participantSessions.map(person => [person.participantSessionId, person])
   );
   const participantRosterEntriesByLoginKey = new Map(
-    (input.participantRosterEntries ?? []).map(entry => [entry.loginKey, entry])
+    participantRosterEntries.map(entry => [entry.loginKey, entry])
   );
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
@@ -7568,56 +7575,98 @@ const listDetailedResponsesForWorkspace = (input: {
     status: input.status
   };
 
-  return input.testRuns
-    .flatMap(testRun => {
-      const normalizedTestRun = normalizeTestRun(testRun);
-      const participantSession =
-        participantSessionsById.get(normalizedTestRun.participantSessionId) ?? null;
+  const selectedRuns = new Map(testRuns.flatMap(rawRun => {
+    const run = normalizeTestRun(rawRun);
+    const person = participantSessionsById.get(run.participantSessionId);
+    const loginKey = person?.loginKey ?? "";
+    const groupKey = person?.groupKey ?? "";
+    const rosterEntry = person ? participantRosterEntriesByLoginKey.get(loginKey) ?? null : null;
+    if (
+      (filters.loginKey && loginKey !== filters.loginKey) ||
+      (filters.groupKey && groupKey !== filters.groupKey) ||
+      (filters.groupKeys?.length && !filters.groupKeys.includes(groupKey)) ||
+      (filters.bookletKey && run.bookletKey !== filters.bookletKey && rosterEntry?.bookletKey !== filters.bookletKey) ||
+      (filters.participantSessionId && run.participantSessionId !== filters.participantSessionId) ||
+      (filters.testRunId && run.testRunId !== filters.testRunId) ||
+      (filters.status && run.status !== filters.status)
+    ) {
+      return [];
+    }
+    return [[run.testRunId, {
+      run, person, loginKey, groupKey, rosterEntry,
+      responses: new Map(Object.entries(run.unitResponses))
+    }] as const];
+  }));
+  if (!selectedRuns.size) {
+    return [];
+  }
 
-      return Object.entries(normalizedTestRun.unitResponses).map(
-        ([unitKey, response]) => ({
-          tenantKey: input.tenantKey,
-          workspaceKey: input.workspaceKey,
-          loginKey: participantSession?.loginKey ?? "",
-          groupKey: participantSession?.groupKey ?? "",
-          participantRosterEntry: participantSession
-            ? participantRosterEntriesByLoginKey.get(participantSession.loginKey) ??
-              null
-            : null,
-          participantSessionId: normalizedTestRun.participantSessionId,
-          testRunId: normalizedTestRun.testRunId,
-          bookletKey: normalizedTestRun.bookletKey,
-          unitKey,
-          response,
-          responseLength: response.length,
-          status: normalizedTestRun.status,
-          updatedAt: normalizedTestRun.updatedAt,
-          completedAt: normalizedTestRun.completedAt
-        })
-      );
-    })
-    .filter(
-      row =>
-        (!filters.loginKey || row.loginKey === filters.loginKey) &&
-        (!filters.groupKey || row.groupKey === filters.groupKey) &&
-        (!filters.groupKeys?.length || filters.groupKeys.includes(row.groupKey)) &&
-        (!filters.bookletKey ||
-          row.bookletKey === filters.bookletKey ||
-          row.participantRosterEntry?.bookletKey === filters.bookletKey) &&
-        (!filters.participantSessionId ||
-          row.participantSessionId === filters.participantSessionId) &&
-        (!filters.testRunId || row.testRunId === filters.testRunId) &&
-        (!filters.unitKey || row.unitKey === filters.unitKey) &&
-        (!filters.status || row.status === filters.status)
-    )
-    .sort(
-      (left, right) =>
-        left.loginKey.localeCompare(right.loginKey) ||
-        left.participantSessionId.localeCompare(right.participantSessionId) ||
-        left.testRunId.localeCompare(right.testRunId) ||
-        left.unitKey.localeCompare(right.unitKey)
-    )
-    .slice(0, resolveOperatorReadLimit(input.limit, input.limitMaximum));
+  const nativeUnits = await repository.listOriginalUnitsByWorkspace(
+    tenantId, workspaceId, [...selectedRuns.keys()], { includeLegacyAttachmentParts: true }
+  );
+  const projectedNativeKeys = new Set<string>();
+  for (const unit of nativeUnits) {
+    const entry = selectedRuns.get(unit.testRunId);
+    if (!entry) {
+      throw resultParentUnavailable();
+    }
+    assertOriginalUnitRecord(unit);
+    assertOriginalUnitParent(unit, entry.run, entry.person);
+    // An unknown or state-only native Unit contributes no response, as in the group count.
+    if (unit.unknownHistory || !unit.parts.length) {
+      continue;
+    }
+    const { responses } = entry;
+    const unitKey = responses.has(unit.unitName)
+      ? unit.unitName
+      : [...responses.keys()].find(key => sameOriginalTestName(key, unit.unitName)) ?? unit.unitName;
+    if (filters.unitKey && unitKey !== filters.unitKey) {
+      continue;
+    }
+    const nativeKey = originalUnitRecordKey({ testRunId: unit.testRunId, unitName: unitKey });
+    if (projectedNativeKeys.has(nativeKey)) {
+      throw new FirstSliceError(409, "original_unit_ambiguous", "The stored Unit identity is ambiguous.");
+    }
+    projectedNativeKeys.add(nativeKey);
+    responses.set(unitKey, serializeVeronaUnitResponse({
+      unitState: {
+        dataParts: Object.fromEntries(unit.parts.map(part => [part.id, part.content])),
+        unitStateDataType: unit.parts.at(-1)?.responseType
+      }
+    }));
+  }
+
+  const rows: WorkspaceDetailedResponse[] = [];
+  for (const { run, loginKey, groupKey, rosterEntry, responses } of selectedRuns.values()) {
+    for (const [unitKey, response] of responses) {
+      if (filters.unitKey && unitKey !== filters.unitKey) {
+        continue;
+      }
+      rows.push({
+        tenantKey,
+        workspaceKey,
+        loginKey,
+        groupKey,
+        participantRosterEntry: rosterEntry,
+        participantSessionId: run.participantSessionId,
+        testRunId: run.testRunId,
+        bookletKey: run.bookletKey,
+        unitKey,
+        response,
+        responseLength: response.length,
+        status: run.status,
+        updatedAt: run.updatedAt,
+        completedAt: run.completedAt
+      });
+    }
+  }
+  return rows.sort(
+    (left, right) =>
+      left.loginKey.localeCompare(right.loginKey) ||
+      left.participantSessionId.localeCompare(right.participantSessionId) ||
+      left.testRunId.localeCompare(right.testRunId) ||
+      left.unitKey.localeCompare(right.unitKey)
+  ).slice(0, resolveOperatorReadLimit(input.limit, input.limitMaximum));
 };
 
 const listGroupResultsForWorkspace = (input: {
@@ -7728,15 +7777,7 @@ const listGroupResultsForWorkspace = (input: {
     );
 };
 
-const formatResponseCsv = (input: {
-  tenantKey: string;
-  workspaceKey: string;
-  participantSessions: ParticipantSession[];
-  participantRosterEntries?: ParticipantRosterEntry[];
-  testRuns: TestRun[];
-} & DetailedResponseFilters): string => {
-  const rows = listDetailedResponsesForWorkspace(input);
-
+const formatResponseCsv = (rows: WorkspaceDetailedResponse[]): string => {
   const header = [
     "tenantKey",
     "workspaceKey",
@@ -31676,43 +31717,10 @@ export const createFirstSliceServices = (
         };
       },
       async listDetailedResponses(input) {
-        const workspace = await requireWorkspace(
-          repository,
-          input.tenantKey,
-          input.workspaceKey
-        );
-        const [participantSessions, participantRosterEntries, testRuns] =
-          await Promise.all([
-            repository.listParticipantSessionsByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listParticipantRosterEntriesByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listTestRunsByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            )
-          ]);
-
-        return listDetailedResponsesForWorkspace({
-          tenantKey: input.tenantKey,
-          workspaceKey: input.workspaceKey,
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
-          loginKey: input.loginKey,
-          groupKey: input.groupKey,
-          groupKeys: input.groupKeys,
-          bookletKey: input.bookletKey,
-          participantSessionId: input.participantSessionId,
-          testRunId: input.testRunId,
-          unitKey: input.unitKey,
-          status: input.status,
-          limit: input.limit
-        });
+        const workspace = await requireWorkspace(repository, input.tenantKey, input.workspaceKey);
+        const rows = await listDetailedResponsesForWorkspace(repository, workspace, input);
+        await input.verifyCurrentAccess?.({ tenantId: workspace.tenantId, workspaceId: workspace.workspaceId });
+        return rows;
       },
       async listGroupResults(input) {
         const workspace = await requireWorkspace(
@@ -31750,44 +31758,15 @@ export const createFirstSliceServices = (
         });
       },
       async exportResponseCsv(input) {
-        const workspace = await requireWorkspace(
-          repository,
-          input.tenantKey,
-          input.workspaceKey
-        );
-        const [participantSessions, participantRosterEntries, testRuns] =
-          await Promise.all([
-            repository.listParticipantSessionsByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listParticipantRosterEntriesByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listTestRunsByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            )
-          ]);
-
-        return formatResponseCsv({
-          tenantKey: input.tenantKey,
-          workspaceKey: input.workspaceKey,
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
-          loginKey: input.loginKey,
-          groupKey: input.groupKey,
-          groupKeys: input.groupKeys,
-          bookletKey: input.bookletKey,
-          participantSessionId: input.participantSessionId,
-          testRunId: input.testRunId,
-          unitKey: input.unitKey,
-          status: input.status,
+        const workspace = await requireWorkspace(repository, input.tenantKey, input.workspaceKey);
+        const rows = await listDetailedResponsesForWorkspace(repository, workspace, {
+          ...input,
           limit: input.limit ?? 50_000,
           limitMaximum: 50_000
         });
+        const csv = formatResponseCsv(rows);
+        await input.verifyCurrentAccess?.({ tenantId: workspace.tenantId, workspaceId: workspace.workspaceId });
+        return csv;
       },
       async exportOriginalResultArchive(input) {
         const workspace = await requireWorkspace(

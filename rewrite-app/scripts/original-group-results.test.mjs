@@ -294,6 +294,8 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
       const before = await overview();
       const unit = {...ids, participantSessionId: first.participantSessionId, testRunId: first.testRunId,
         contentReleaseId: release, unitName: 'NATIVE.ONLY'};
+      const responseFilter = {...scope, groupKeys: [groupKey], testRunId: first.testRunId};
+      const getDetails = unitKey => services.workspaceAdminRead.listDetailedResponses({...responseFilter, unitKey});
       const putParts = (parts, unknownHistory) => repository.mutateOriginalUnit(unit, () => ({
         unit: {...unit, originalUnitId: 'ORIGINAL.A1', stateInitialized: true,
           state: {}, stateClocks: {}, parts, ...(unknownHistory ? {unknownHistory} : {})},
@@ -303,12 +305,15 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
       const stateOnly = await overview();
       assert.equal(stateOnly.numUnitsTotal, before.numUnitsTotal + 1);
       assert.equal(stateOnly.responseCount, before.responseCount);
+      assert.deepEqual(await getDetails(unit.unitName), []);
       const parts = [
         {id: 'left', content: privateResponse, ts: Date.parse(stamp(16)), responseType: 'iqb@1.0'},
-        {id: 'right', content: null, ts: Date.parse(stamp(16)), responseType: 'iqb@1.0'}
+        {id: 'right', content: null, ts: Date.parse(stamp(16)), responseType: 'iqb@1.0'},
+        {id: 'empty', content: '', ts: Date.parse(stamp(16)), responseType: 'iqb@1.0'}
       ];
       await putParts(parts, true);
       assert.equal((await overview()).responseCount, before.responseCount);
+      assert.deepEqual(await getDetails(unit.unitName), []);
       await putParts(parts);
       await close();
       await open();
@@ -318,6 +323,43 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
       assert.equal(answered.lastChangeAt, before.lastChangeAt);
       const projection = await repository.getOriginalGroupResultInventory(...Object.values(ids));
       assert.equal(JSON.stringify(projection).includes(privateResponse), false);
+
+      const details = await getDetails(unit.unitName);
+      assert.equal(details.length, 1);
+      const [detail] = details;
+      assert.equal(detail.unitKey, unit.unitName);
+      assert.equal(detail.participantSessionId, first.participantSessionId);
+      assert.equal(detail.groupKey, groupKey);
+      assert.equal(detail.responseLength, detail.response.length);
+      const response = JSON.parse(detail.response);
+      assert.equal(response.kind, 'verona_unit_state');
+      assert.deepEqual(response.unitState, {
+        dataParts: {left: privateResponse, right: 'null', empty: ''},
+        unitStateDataType: 'iqb@1.0'
+      });
+      assert.deepEqual(response.dataPartValueTypes, {left: 'string', right: 'json', empty: 'string'});
+      const csv = await services.workspaceAdminRead.exportResponseCsv({...responseFilter, unitKey: unit.unitName});
+      assert.equal(csv.trimEnd().split('\n').length, 2);
+      assert.ok(csv.includes('"' + detail.response.replaceAll('"', '""') + '"'));
+      const legacy = await services.workspaceAdminRead.listDetailedResponses({...scope, groupKey: survivor.groupKey});
+      assert.equal(legacy.length, 1);
+      assert.equal(legacy[0].response, privateResponse);
+
+      const persistedRun = (await repository.listTestRunsByWorkspace(ids.tenantId, ids.workspaceId))
+        .find(run => run.testRunId === first.testRunId);
+      const existingKey = 'native.only';
+      await repository.saveTestRun({...persistedRun, unitResponses: {...persistedRun.unitResponses,
+        [existingKey]: 'Old canonical answer for the same Unit'}});
+      const [updated] = await getDetails(existingKey);
+      assert.equal(updated.response, 'Old canonical answer for the same Unit');
+      assert.deepEqual(await getDetails(unit.unitName), []);
+
+      await putParts(parts);
+      const [aliased] = await getDetails(existingKey);
+      assert.equal(aliased.unitKey, existingKey);
+      assert.equal(aliased.response, detail.response);
+      assert.deepEqual(await getDetails(unit.unitName), []);
+      assert.equal((await overview()).responseCount, answered.responseCount);
 
       const deletion = await services.workspaceResults.deleteGroupResultsBulk({
         ...scope, groupKeys: [groupKey], confirmation: scope.workspaceKey
