@@ -13,16 +13,26 @@ const serverTime = (value: unknown): number => {
 };
 export type OriginalResultTest = Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId'> & {
   savedUnitKeys: string[]; bookletName?: string; lastOpenedAt?: string | null; lastTestModifiedAt?: string | null;
-  responseCount?: number; updatedAt?: string;
+  createdAt?: string; responseCount?: number; updatedAt?: string;
 };
-export function projectOriginalResultTest(run: Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId' | 'originalResultState'> & Partial<Pick<TestRun,'unitResponses' | 'updatedAt'>>,
-  savedUnitKeys: readonly string[] = Object.keys(run.unitResponses ?? {}),nativeUnitKeys:readonly string[]=[]): OriginalResultTest {
+export type OriginalResultNativeUnit = { unitName: string; hasResponse: boolean };
+export function projectOriginalResultTest(run: Pick<TestRun, 'testRunId' | 'participantSessionId' | 'tenantId' | 'workspaceId' | 'contentReleaseId' | 'originalResultState'> & Partial<Pick<TestRun,'unitResponses' | 'createdAt' | 'updatedAt'>>,
+  savedUnitKeys: readonly string[] = Object.keys(run.unitResponses ?? {}),
+  nativeUnits: readonly OriginalResultNativeUnit[] = []): OriginalResultTest {
   if (!Array.isArray(savedUnitKeys) || savedUnitKeys.some(key => typeof key !== 'string')) throw unavailable();
-  const state = run.originalResultState,units=[...savedUnitKeys];
-  for(const key of nativeUnitKeys)if(!units.some(existing=>originalParticipantGroupKeysEqual(existing,key)))units.push(key);
+  const state = run.originalResultState;
+  const units = [...savedUnitKeys];
+  const responseUnitKeys = [...savedUnitKeys];
+  for (const {unitName, hasResponse} of nativeUnits) {
+    if (!units.some(key => originalParticipantGroupKeysEqual(key, unitName))) units.push(unitName);
+    if (hasResponse && !responseUnitKeys.some(key => originalParticipantGroupKeysEqual(key, unitName))) {
+      responseUnitKeys.push(unitName);
+    }
+  }
   return {testRunId: run.testRunId, participantSessionId: run.participantSessionId, tenantId: run.tenantId, workspaceId: run.workspaceId,
     contentReleaseId: run.contentReleaseId, savedUnitKeys: units,
-    ...(run.updatedAt === undefined ? {} : {updatedAt: run.updatedAt, responseCount: savedUnitKeys.length}),
+    ...(run.createdAt === undefined ? {} : {createdAt: run.createdAt}),
+    ...(run.updatedAt === undefined ? {} : {updatedAt: run.updatedAt, responseCount: responseUnitKeys.length}),
     ...(state?.bookletName === undefined ? {} : {bookletName: state.bookletName}),
     ...(state?.lastOpenedAt === undefined ? {} : {lastOpenedAt: state.lastOpenedAt}),
     ...(state?.lastTestModifiedAt === undefined ? {} : {lastTestModifiedAt: state.lastTestModifiedAt})};

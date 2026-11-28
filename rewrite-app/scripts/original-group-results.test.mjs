@@ -13,7 +13,7 @@ import {createInMemoryFirstSliceRepository} from '@testcenter-rewrite-app/memory
 import {createFileFirstSliceStorage} from '@testcenter-rewrite-app/file-store';
 import {createSqliteFirstSliceStorage} from '@testcenter-rewrite-app/sqlite-store';
 import {createPostgresFirstSliceStorage} from '@testcenter-rewrite-app/postgres-store';
-import {createOriginalGroupResultsPort, projectOriginalGroupResults} from '../packages/application/dist/packages/application/src/original-group-results.js';
+import {createOriginalGroupResultsPort, projectOriginalGroupResults, projectOriginalResultTest} from '../packages/application/dist/packages/application/src/original-group-results.js';
 import {prepareOriginalXmlSchemaValidator} from '../packages/application/dist/packages/application/src/original-xml-schema.js';
 import {createProductionApiServer} from '../apps/api/dist/apps/api/src/index.js';
 
@@ -39,6 +39,18 @@ const privateResponse = 'OWNED_PRIVATE_RESULT_PAYLOAD_Ω';
 const kinds = ['memory', 'file', 'sqlite'];
 if (process.env.FIRST_SLICE_STORE === 'postgres') {assert.ok(process.env.FIRST_SLICE_POSTGRES_URL); kinds.push('postgres');}
 const historyError = error => error.errorCode === 'original_result_history_unavailable' && error.statusCode === 409;
+
+test('response counts merge native and legacy aliases without counting state-only Units', () => {
+  const run = {testRunId: 'run', participantSessionId: 'person', tenantId: 'tenant', workspaceId: 'workspace',
+    contentReleaseId: 'release', updatedAt: stamp(1), unitResponses: {'Alias.Ä': 'legacy'}};
+  const result = projectOriginalResultTest(run, undefined, [
+    {unitName: 'alias.ä', hasResponse: true},
+    {unitName: 'alias.a', hasResponse: true},
+    {unitName: 'STATE.ONLY', hasResponse: false}
+  ]);
+  assert.equal(result.responseCount, 2);
+  assert.deepEqual(result.savedUnitKeys, ['Alias.Ä', 'alias.a', 'STATE.ONLY']);
+});
 
 test('a large native group uses indexed Login lookups and bounded aggregate arguments', {timeout: 30_000}, () => {
   const count = 140_001, scope = {tenantId: 'owned-large-tenant', workspaceId: 'owned-large-workspace'}, contentReleaseId = 'owned-large-release';
@@ -274,6 +286,81 @@ for (const kind of kinds) test(`${kind}: Original result groups use frozen label
         const value = Reflect.get(target, key); return typeof value === 'function' ? value.bind(target) : value;
       }});
       assert.deepEqual(await createFirstSliceServices({repository: guarded}).originalGroupResults.list(scope), before);
+    });
+    await t.test('native response parts affect the group and deletion count once per Unit across reopen', async () => {
+      const groupKey = 'ORACLE.ATOMIC';
+      const overview = async () => (await readOverview()).find(row => row.groupKey === groupKey);
+      const survivor = (await readOverview()).find(row => row.groupKey === 'Canonical.Extension');
+      const before = await overview();
+      const unit = {...ids, participantSessionId: first.participantSessionId, testRunId: first.testRunId,
+        contentReleaseId: release, unitName: 'NATIVE.ONLY'};
+      const putParts = (parts, unknownHistory) => repository.mutateOriginalUnit(unit, () => ({
+        unit: {...unit, originalUnitId: 'ORIGINAL.A1', stateInitialized: true,
+          state: {}, stateClocks: {}, parts, ...(unknownHistory ? {unknownHistory} : {})},
+        logs: []
+      }));
+      await putParts([]);
+      const stateOnly = await overview();
+      assert.equal(stateOnly.numUnitsTotal, before.numUnitsTotal + 1);
+      assert.equal(stateOnly.responseCount, before.responseCount);
+      const parts = [
+        {id: 'left', content: privateResponse, ts: Date.parse(stamp(16)), responseType: 'iqb@1.0'},
+        {id: 'right', content: null, ts: Date.parse(stamp(16)), responseType: 'iqb@1.0'}
+      ];
+      await putParts(parts, true);
+      assert.equal((await overview()).responseCount, before.responseCount);
+      await putParts(parts);
+      await close();
+      await open();
+      const answered = await overview();
+      assert.equal(answered.responseCount, before.responseCount + 1);
+      assert.equal(answered.numUnitsTotal, stateOnly.numUnitsTotal);
+      assert.equal(answered.lastChangeAt, before.lastChangeAt);
+      const projection = await repository.getOriginalGroupResultInventory(...Object.values(ids));
+      assert.equal(JSON.stringify(projection).includes(privateResponse), false);
+
+      const deletion = await services.workspaceResults.deleteGroupResultsBulk({
+        ...scope, groupKeys: [groupKey], confirmation: scope.workspaceKey
+      });
+      assert.equal(deletion.deletedTestRunCount, before.bookletsStarted);
+      assert.equal(deletion.deletedResponseCount, answered.responseCount);
+      await close();
+      await open();
+      assert.equal(await overview(), undefined);
+      assert.deepEqual((await readOverview()).find(row => row.groupKey === survivor.groupKey), survivor);
+    });
+    await t.test('opened canonical Runs include review-only Units and use the Test clock', async () => {
+      const participantSessionId = randomUUID();
+      const groupKey = 'Canonical.Opened';
+      await repository.saveParticipantSession({...ids, contentReleaseId: release, participantSessionId,
+        loginKey: 'owned-opened-canonical', groupKey, status: 'launched', createdAt: stamp(20)});
+      const run = {...ids, contentReleaseId: release, participantSessionId, testRunId: randomUUID(),
+        bookletKey: 'ORACLE.BOOK.A', executionMode: 'run-hot-return', status: 'created',
+        currentUnitKey: 'A1', unitResponses: {}, createdAt: stamp(20), updatedAt: stamp(20), completedAt: null,
+        originalResultState: {bookletName: 'ORACLE.BOOK.A', bookletLabel: 'Booklet A',
+          lastOpenedAt: null, lastTestStateAt: null, hasTestState: false, lastTestModifiedAt: stamp(20)}};
+      const overview = async () => (await readOverview()).find(row => row.groupKey === groupKey);
+      await repository.saveTestRun(run);
+      assert.equal(await overview(), undefined);
+
+      const started = {...run, status: 'running', updatedAt: stamp(21),
+        originalResultState: {...run.originalResultState, lastOpenedAt: stamp(21), lastTestModifiedAt: stamp(21)}};
+      await repository.saveTestRun(started);
+      assert.deepEqual(overviewMetrics(await overview()), [1, 0, 0, 0, 0]);
+      clock = 22;
+      const {review} = await services.workspaceReview.createReview({...scope, participantSessionId,
+        testRunId: run.testRunId, unitKey: 'A2', reviewerId: 'owned', category: 'quality', comment: 'Owned canonical review'});
+      assert.deepEqual(overviewMetrics(await overview()), [1, 1, 1, 1, 1]);
+      assert.equal((await overview()).responseCount, 0);
+      await repository.saveTestRun({...started, updatedAt: stamp(23), unitResponses: {A1: privateResponse}});
+      await services.workspaceReview.deleteReview({...scope, reviewId: review.reviewId});
+      await close();
+      await open();
+      const answered = await overview();
+      assert.deepEqual(overviewMetrics(answered), [1, 2, 2, 2, 2]);
+      assert.equal(answered.responseCount, 1);
+      assert.equal(answered.reviewCount, 0);
+      assert.equal(answered.lastChangeAt, stamp(21));
     });
   } finally {
     await close();

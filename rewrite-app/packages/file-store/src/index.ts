@@ -1909,7 +1909,13 @@ const createFileRepository = (
         people: Object.values(state.participantSessions).filter(scoped),
         bindings: Object.values(state.originalLoginBindings).filter(scoped),
         groups: Object.values(state.originalParticipantGroups).filter(scoped),
-        runs: Object.values(state.testRuns).filter(scoped).map(run => projectOriginalResultTest(run,Object.keys(run.unitResponses),(nativeByRun.get(run.testRunId)??[]).filter(unit=>originalUnitParentMatches(run,unit)).map(unit=>unit.unitName))),
+        runs: Object.values(state.testRuns).filter(scoped).map(run => {
+          const units = (nativeByRun.get(run.testRunId) ?? []).filter(unit => originalUnitParentMatches(run, unit));
+          return projectOriginalResultTest(run, Object.keys(run.unitResponses), units.map(unit => ({
+            unitName: unit.unitName,
+            hasResponse: !unit.unknownHistory && Boolean(unit.parts?.length)
+          })));
+        }),
         reviews: Object.values(state.workspaceReviews).filter(scoped),
         events: Object.values(state.workspaceActivityEvents).filter(scoped)
       });

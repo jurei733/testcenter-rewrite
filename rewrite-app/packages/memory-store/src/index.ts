@@ -1033,7 +1033,13 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         people: Array.from(state.participantSessions.values()).filter(scoped),
         bindings: Array.from(state.originalLoginBindings.values()).filter(scoped),
         groups: Array.from(state.originalParticipantGroups.values()).filter(scoped),
-        runs: Array.from(state.testRuns.values()).filter(scoped).map(run => projectOriginalResultTest(run,Object.keys(run.unitResponses),(nativeByRun.get(run.testRunId)??[]).filter(unit=>originalUnitParentMatches(run,unit)).map(unit=>unit.unitName))),
+        runs: Array.from(state.testRuns.values()).filter(scoped).map(run => {
+          const units = (nativeByRun.get(run.testRunId) ?? []).filter(unit => originalUnitParentMatches(run, unit));
+          return projectOriginalResultTest(run, Object.keys(run.unitResponses), units.map(unit => ({
+            unitName: unit.unitName,
+            hasResponse: !unit.unknownHistory && Boolean(unit.parts?.length)
+          })));
+        }),
         reviews: Array.from(state.workspaceReviews.values()).filter(scoped),
         events: Array.from(state.workspaceActivityEvents.values()).filter(scoped)
       });

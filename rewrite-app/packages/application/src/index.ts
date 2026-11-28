@@ -89,7 +89,7 @@ export type {OriginalGroupDeletionInput, OriginalGroupDeletionResult} from './or
 export {projectOriginalGroupResultInventory} from './original-group-results.js';
 export type {OriginalGroupResultInventory} from './original-group-results.js';
 export {projectOriginalResultTest} from './original-group-results.js';
-export type {OriginalResultTest} from './original-group-results.js';
+export type {OriginalResultNativeUnit, OriginalResultTest} from './original-group-results.js';
 import {createOriginalGroupResultsPort, projectOriginalStartedTests, type OriginalGroupResultInventory} from './original-group-results.js';
 export {prepareOriginalTestSelection,prepareOriginalTestDeletionInput,selectOriginalTestDeletion,deleteOriginalSelectedTestsFromCollections} from './original-test-deletion.js';
 export type {OriginalTestSelection,OriginalTestDeletionInput,OriginalTestDeletionResult} from './original-test-deletion.js';
@@ -7661,16 +7661,34 @@ const listGroupResultsForWorkspace = (input: {
     runs: inventory.runs.filter(run => run.lastOpenedAt !== undefined)
   });
   const nativeByRun = new Map(Array.from(started, result => [result.run.testRunId, result]));
+  const canonicalStarted = inventory.runs.filter(run => {
+    const person = participantSessionsById.get(run.participantSessionId);
+    return person && person.originalLoginKey === undefined &&
+      person.tenantId === input.tenantId && person.workspaceId === input.workspaceId &&
+      run.tenantId === input.tenantId && run.workspaceId === input.workspaceId &&
+      person.contentReleaseId === run.contentReleaseId &&
+      typeof run.lastOpenedAt === "string" && Number.isFinite(Date.parse(run.lastOpenedAt)) &&
+      typeof run.lastTestModifiedAt === "string" && Number.isFinite(Date.parse(run.lastTestModifiedAt));
+  });
+  const canonicalSavedUnits = selectOriginalSavedUnitKeys({
+    testRuns: canonicalStarted,
+    persistedUnitKeys: new Map(canonicalStarted.map(run => [run.testRunId, run.savedUnitKeys])),
+    reviews: inventory.reviews,
+    activityEvents: inventory.events
+  });
   const summaries = new Map<string, WorkspaceGroupResultSummary>();
   for (const run of inventory.runs) {
     const person = participantSessionsById.get(run.participantSessionId);
     if (!person?.groupKey) continue;
+    if (run.lastOpenedAt === null) continue;
     const native = nativeByRun.get(run.testRunId);
-    if (person.originalLoginKey !== undefined && run.lastOpenedAt === null) continue;
+    const canonicalUnits = canonicalSavedUnits.get(run.testRunId);
     const groupKey = person.groupKey;
     const responseCount = run.responseCount ?? 0;
-    const unitCount = native?.unitCount ?? responseCount;
-    const lastChangeAt = native ? new Date(native.lastChange * 1000).toISOString() : run.updatedAt ?? "";
+    const unitCount = native?.unitCount ?? canonicalUnits?.size ?? responseCount;
+    const lastChangeAt = native
+      ? new Date(native.lastChange * 1000).toISOString()
+      : (canonicalUnits ? run.lastTestModifiedAt : run.updatedAt) ?? "";
     let summary = summaries.get(groupKey);
     if (!summary) {
       summary = {
@@ -26982,13 +27000,10 @@ export const createFirstSliceServices = (
     }
 
     const groupKeySet = new Set(groupKeys);
-    const [participantSessions, testRuns] = await Promise.all([
-      repository.listParticipantSessionsByWorkspace(
-        workspace.tenantId,
-        workspace.workspaceId
-      ),
-      repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
-    ]);
+    const {people: participantSessions, runs: testRuns} = await repository.getOriginalGroupResultInventory(
+      workspace.tenantId,
+      workspace.workspaceId
+    );
     const affectedParticipantSessionIds = participantSessions
       .filter(participantSession => groupKeySet.has(participantSession.groupKey))
       .map(participantSession => participantSession.participantSessionId)
@@ -27000,11 +27015,10 @@ export const createFirstSliceServices = (
       .filter(testRun =>
         affectedParticipantSessionIdSet.has(testRun.participantSessionId)
       )
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+      .sort((left, right) => (left.createdAt ?? "").localeCompare(right.createdAt ?? ""));
     const deletedTestRunIds = deletedTestRuns.map(testRun => testRun.testRunId);
     const deletedResponseCount = deletedTestRuns.reduce(
-      (total, testRun) =>
-        total + Object.keys(normalizeTestRun(testRun).unitResponses).length,
+      (total, testRun) => total + (testRun.responseCount ?? 0),
       0
     );
     const deletedTestRunIdSet = new Set(deletedTestRunIds);
